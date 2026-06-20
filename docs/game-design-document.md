@@ -1,5 +1,5 @@
 # Flying Car Business Simulator — Game Design Document
-*Last updated: 2026-06-20 (Sprint 0 rev 2)*
+*Last updated: 2026-06-20 (Sprint 0 rev 3)*
 
 ---
 
@@ -10,6 +10,30 @@ A famous inventor releases the flying car patent to the world. Governments are s
 Each company receives **$100M in venture capital funding** and competes over **8 rounds (years)** to build the most valuable flying car company. The winner is determined by **Company Valuation Score** at the end of Year 8.
 
 **Traditional cars are not a player option.** They are an ambient market force and competitive adversary that all players face — their market share shrinks as flying car adoption grows, and the traditional car lobby actively works against players via baseline negative policy pressure each year.
+
+---
+
+## 1.1 Game Modes
+
+The simulator supports two play modes. The core game mechanics are identical; what differs is who controls the pacing and how the game is administered.
+
+### Classroom Mode
+Designed for structured educational settings (university courses, corporate training, workshops).
+
+- A **Facilitator** creates the game and stands outside it — they are not a player and do not control a company
+- The facilitator controls round pacing: they manually open each round, can pause between rounds for debrief, and can observe all teams' progress without participating
+- Full facilitator dashboard: round-by-round control panel, team status overview, ability to inject context between rounds
+- Rounds are open-ended (no timer) — the facilitator closes a round when all teams have submitted or when time is called
+
+### Party Mode
+Designed for self-organized play among friends or colleagues — no external administrator needed.
+
+- One player is designated the **Host** at game creation; the host is a full participant with their own company
+- The host has one additional power: a **Start** button in the lobby to launch the game when everyone is ready
+- Once the game starts, it runs itself: rounds open automatically, a visible countdown timer drives submission, and rounds resolve automatically when all teams submit (or when the timer expires)
+- No facilitator account or dashboard — the host is just a player with a launch key
+
+**Implementation note:** Both modes share the same database schema (`FACILITATOR` role) and API. In Party Mode, the host's User record has `role: FACILITATOR` but they also hold a `TeamMember` record with their chosen company role. The UI branches on whether the facilitator has a team membership.
 
 ---
 
@@ -761,7 +785,10 @@ This makes capacity decisions feel consequential in both directions — overprod
 - Only **CEO** can submit the final round decision package
 - Each role can edit their section independently before CEO locks it
 - For teams with fewer than 5 members, roles are combined (CEO handles any unclaimed section)
-- In party mode, a timer shows per-round; CEO sees a live status of which roles have completed their section
+
+**Party Mode timing:** A countdown timer is visible to all players each round. The CEO sees a live status panel showing which roles on their team have completed their section. When the timer expires, any unsubmitted teams are auto-submitted with whatever decisions are currently saved (defaults used for any blank sections).
+
+**Classroom Mode timing:** No timer — the facilitator controls when a round closes. The facilitator dashboard shows per-team submission status; the facilitator can nudge teams or close the round manually.
 
 ---
 
@@ -917,6 +944,7 @@ The leaderboard (Valuation, Revenue, CAGR, Market Share, Brand Score) publishes 
 | 22 | R&D: 4-tier tech tree (16 one-time unlocks) + recurring investments; cross-path prereqs for pinnacle unlocks | ✅ |
 | 23 | Year 1 Market Briefing: distributed before decisions; includes demand totals, public perception, policy baseline | ✅ |
 | 24 | Brand and model naming: team-controlled, profanity-filtered, character-limited | ✅ |
+| 25 | Two game modes: Classroom (external facilitator, manual round pacing) and Party (host is a player, timer-driven auto-resolve). Same schema — host has FACILITATOR role + TeamMember record. UI branches on team membership. | ✅ |
 
 ---
 
@@ -926,13 +954,13 @@ The leaderboard (Valuation, Revenue, CAGR, Market Share, Brand Score) publishes 
 
 | Sprint | Focus | Status |
 |---|---|---|
-| Sprint 0 | Game Design Document | 🔄 In progress |
-| Sprint 1 | Tech stack, scaffolding, GitHub repo | Pending |
-| Sprint 2 | Database schema + auth | Pending |
-| Sprint 3 | Game & team management | Pending |
-| Sprint 4 | Decision submission UI | Pending |
-| Sprint 5 | Simulation engine | Pending |
-| Sprint 6 | Results & dashboards | Pending |
-| Sprint 7 | Party mode (real-time timers, live status) | Pending |
-| Sprint 8 | World events system | Pending |
+| Sprint 0 | Game Design Document | ✅ Done |
+| Sprint 1 | Tech stack, scaffolding, GitHub repo | ✅ Done |
+| Sprint 2 | Database schema + auth | ✅ Done |
+| Sprint 3 | Game & team management (lobby, join flow, start game) | ✅ Done |
+| Sprint 4 | Decision submission UI (all 5 role sections) | Pending |
+| Sprint 5 | Simulation engine (demand allocation, financials, round resolution) | Pending |
+| Sprint 6 | Results & dashboards (round report, leaderboard, team financials) | Pending |
+| Sprint 7 | Party mode (host flow, countdown timer, auto-resolve) + Classroom mode (facilitator round control, debrief tools) | Pending |
+| Sprint 8 | World events system (full event pool, policy weighting, lobbying steering) | Pending |
 | Sprint 9 | Deploy & playtest | Pending |
