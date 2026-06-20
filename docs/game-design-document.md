@@ -1,5 +1,5 @@
 # Flying Car Business Simulator — Game Design Document
-*Sprint 0 artifact. Last updated: 2026-06-20*
+*Last updated: 2026-06-20 (Sprint 0 rev 2)*
 
 ---
 
@@ -32,10 +32,37 @@ The traditional car industry automatically lobbies against flying cars every yea
 
 ### 2.3 Flying Car Demand Growth
 
-- **Base YoY growth**: +3% of prior year's total demand
-- **Maximum growth cap per year**: `(e^0.15) - 1` ≈ **16.18%** above prior year
-- **Category marketing effect**: Each $1M spent on *category* messaging → +0.01 increase to the growth exponent (wiped each year, must be repurchased)
-- **Policy effect**: Each +5 policy points above 0 → +1% permanent demand increase for flying cars, -1% for traditional (stacks year over year)
+Flying car demand grows from two distinct sources each year:
+
+**Source 1 — Organic growth** (word of mouth, tech diffusion, repeat referral):
+```
+Organic = Prior Year Flying Car Demand × base_organic_rate
+base_organic_rate = 0.03 (3% per year)
+```
+Enhanced by: category marketing ($1M → +0.01 to organic exponent, wiped each year), R&D unlocks.
+
+**Source 2 — Market conversion** (traditional car buyers switching):
+```
+Conversion = Prior Year Traditional Car Demand × base_conversion_rate
+base_conversion_rate = 0.001 (0.1% per year)
+```
+At Year 1 baseline: 18M × 0.1% ≈ 18,000 switchers. Enhanced by policy score (each +5 policy above 0 → +0.05% additional conversion rate), and by major R&D unlocks (All-Electric: +0.04%; Full Autonomy Certification: +0.06%).
+
+**Total flying car demand growth = Organic + Conversion**
+
+Base case (no investment): ~9% growth in Year 1. With sustained policy, marketing, and R&D: growth approaches or hits the cap. Over 8 years, the market can plausibly reach ~1M units — roughly EVs' trajectory from Tesla-scale launch.
+
+- **Maximum growth cap per year**: `(e^0.15) - 1` ≈ **16.18%** above prior year. The cap reflects infrastructure constraints, regulatory friction, and manufacturing limits — not demand limits. It kicks in precisely when players are executing well.
+- **Policy effect (cumulative)**: Each +5 policy points above 0 → +1% permanent demand multiplier for flying cars, -1% for traditional. Stacks year over year from the year it was first achieved.
+
+**Traditional car demand is the remainder:**
+```
+Traditional Car Demand (Year N) = Total Vehicle Market (Year N) − Flying Car Demand (Year N)
+Total Vehicle Market grows at +0.8%/year (background population and economic growth)
+Year 1 total: 18,300,000 (18,000,000 traditional + 300,000 flying)
+```
+
+This means flying car growth visibly erodes the traditional car market — making policy investment feel consequential.
 
 ### 2.4 Car Type Demand Matrix (Year 1)
 
@@ -78,6 +105,32 @@ Applied on top of the overall market growth rate each year. Regional character p
 | Regional breakdown by type | | ✅ |
 | Next year's demand forecast per type/region | | ✅ |
 | Type growth modifiers | Never revealed — inferred from results | |
+
+### 2.7 Year 1 Market Briefing
+
+Before any decisions are submitted in Year 1, all teams receive a **pre-game market briefing** — a one-time document that establishes the baseline environment. This is the information the industry has collectively observed since the patent release; it is not the Round Report (which comes *after* decisions resolve).
+
+**Contents of the Year 1 Briefing:**
+
+| Category | Information Provided |
+|---|---|
+| Market size | Total flying car demand: 300,000 units nationally (Year 1) |
+| Demand by type | National units per vehicle type (±5% accuracy) — compact, sedan, SUV, sports car, truck |
+| Regional character | Qualitative profile of each region (price sensitivity, demographic skew) — not specific unit counts |
+| Public perception | Flying car industry perception: **+30** (public is excited; traditional cars: 0) |
+| Policy environment | Policy score: **0** (neutral). NPC traditional car lobby is active: -3 points/year automatically |
+| Competitive landscape | Number of teams; each team's starting cash ($100M); no competitive intel yet |
+| Economic conditions | Current economic climate (set by facilitator: Stable / Growth / Recession) |
+| Technology horizon | Known that autonomous driving, EV, and fuel efficiency R&D paths exist — costs and prerequisite chains are *not* disclosed upfront |
+
+**What is NOT in the briefing:**
+- Regional demand breakdown by type (requires Market Analytics Platform R&D unlock or annual Market Research purchase)
+- Type growth modifiers (never directly revealed)
+- Competitors' strategies (nothing has happened yet)
+
+The briefing is designed to let teams make informed Year 1 decisions — factory size, vehicle type, initial R&D direction — without giving away the long-game dynamics. The tech tree structure is opaque at the start; teams discover it through the facilitator's R&D menu when they access the decision interface.
+
+---
 
 ### 2.5 US Sales Regions
 
@@ -171,6 +224,15 @@ Teams can design one or more car models. A model persists year to year but can b
 
 **Flying cars only.** Traditional cars are NPC adversaries, not a player option.
 
+#### Brand & Model Naming
+
+Teams name their **company brand** and each **car model** they design. Names appear in the Round Report, the leaderboard, and all in-game communications.
+
+- **Company brand**: Set at game creation, before Year 1. Can be changed once per game (rebrand event — costs $1M in perceived brand disruption, applied as a one-time brand perception penalty).
+- **Car model names**: Set when a model is first designed. Can be renamed each round at no cost.
+- **Profanity filter**: All names pass through a server-side word filter at input. Names that fail are rejected with a prompt to try again. The filter applies to both brand and model names.
+- **Character limits**: Brand name: 2–30 characters. Model name: 2–24 characters. Alphanumeric + spaces + hyphens only.
+
 #### Vehicle Type
 
 | Type | Base Manufacturing Cost | Engineering Redesign Fee | Notes |
@@ -256,49 +318,99 @@ Teams choose to **rent** or **buy**. They can upgrade in a later round. Selling 
 
 ### 5.4 R&D
 
-Teams allocate R&D spending each round. Effects are applied the **following** year unless noted.
+Teams allocate R&D spending each round. Effects are applied the **following** year unless noted. Teams can invest in multiple areas per round; costs are additive.
 
-Teams can invest in multiple areas per round; costs are additive.
+R&D has two categories: **recurring investments** (buy each year for incremental benefit) and the **tech tree** (one-time unlocks with explicit prerequisites). The tech tree is organized in four tiers — later tiers are more powerful but require earlier investments first.
+
+---
+
+#### Recurring R&D Investments (no prerequisites, buyable every round)
 
 | Investment | Cost | Effect |
 |---|---|---|
-| Improve manufacturing efficiency | $4M | -5% per-unit manufacturing cost (stackable, cap: -35%) |
-| Improve marketing effectiveness | $3M | +20% on next year's marketing spend dollar efficiency |
-| **Unlock: Autonomous driving mode** | $12M one-time | Adds feature option to all models; demand ↑ in safety/tech segments |
-| **Unlock: Fuel efficiency upgrade** | $7M one-time | Reduces fuel cost for buyers → demand ↑; West Coast especially |
-| **Unlock: All-electric drivetrain** | $14M one-time | Opens EV segment; policy bonus +5; brand perception ↑ |
-| Improve part dependability | $5M | Reliability score ↑; existing fleet -20% recall risk |
-| Pricing research | $1M | Reveals competitors' average sale prices this round |
-| Competitor research | $2M | Reveals one competitor's production volume and vehicle type |
-| Market research | $1.5M | Reveals next year's demand forecast per region with higher accuracy |
+| Improve marketing effectiveness | $3M | +20% on next year's marketing spend dollar efficiency (stackable) |
+| Improve part dependability | $5M | Reliability score ↑; existing fleet -20% recall risk (stackable) |
+| Pricing research | $1M | Reveals all competitors' average sale prices this round |
+| Competitor research | $2M | Reveals one competitor's production volume and vehicle type this round |
+| Market research | $1.5M | Reveals next year's demand forecast per region (accuracy enhanced by Market Analytics Platform unlock) |
+
+---
+
+#### R&D Tech Tree
+
+The tech tree contains **one-time permanent unlocks** organized into four tiers. Prerequisites must be purchased in prior rounds (not the same round). Each unlock is exclusive for a window after first investment (see Section 11.4).
+
+Teams do not see the full tech tree at game start — the menu reveals available unlocks and their immediate prerequisites, but not deeper tiers. This creates an exploration dynamic: early R&D investment opens the picture.
+
+**Tier 1 — Foundation** *(always available, Year 1 onward)*
+
+| Unlock | Cost | Effect | Unlocks Path |
+|---|---|---|---|
+| Manufacturing Efficiency I | $4M | -5% per-unit manufacturing cost | Efficiency path |
+| Advanced Aerodynamics | $4M | +2% demand across sedan/SUV/sports car; reliability ↑ | Performance & Safety path |
+| Battery Research | $5M | +1% demand (eco-conscious segment); conversion rate bonus ↑ | Green Tech path |
+| Market Analytics Platform | $3M | Regional breakdown revealed permanently every round (no annual purchase needed) | Intelligence path |
+
+**Tier 2 — Core Technologies** *(requires named Tier 1 unlock)*
+
+| Unlock | Cost | Effect | Prereq |
+|---|---|---|---|
+| Manufacturing Efficiency II | $5M | Additional -8% unit cost (−13% cumulative) | Mfg Eff I |
+| Fly-By-Wire Systems | $8M | Reliability ↑↑; unlocks Lane Assist & Safety Camera feature options; recall risk ↓↓ | Advanced Aerodynamics |
+| Fuel Cell Research | $6M | Reduces EV manufacturing premium by 15%; demand ↑ eco segment | Battery Research |
+| Competitive Intelligence Suite | $4M | Reveals all competitors' parts quality tier in Round Report each round permanently | Market Analytics Platform |
+
+**Tier 3 — Major Unlocks** *(requires named Tier 2 unlock)*
+
+| Unlock | Cost | Effect | Prereq |
+|---|---|---|---|
+| Manufacturing Efficiency III | $6M | Additional -10% unit cost (−23% cumulative) | Mfg Eff II |
+| Autonomous Flight Systems | $12M | Adds Autonomous Driving Mode feature to all models; demand ↑↑ tech/safety segments; conversion rate +0.04% | Fly-By-Wire Systems |
+| Fuel Efficiency Upgrade | $7M | Fuel cost ↓ for buyers → demand ↑; West Coast especially; conversion rate +0.03% | Fuel Cell Research |
+| Demand Forecasting AI | $6M | Permanently reveals type growth modifiers; provides 2-year forward demand forecasts per region | Competitive Intelligence Suite |
+
+**Tier 4 — Pinnacle** *(requires named Tier 3 unlock; some require cross-path)*
+
+| Unlock | Cost | Effect | Prereq |
+|---|---|---|---|
+| Manufacturing Mastery | $8M | Additional -12% unit cost (−35% cumulative; hard cap); manufacturing capacity soft +10% | Mfg Eff III |
+| All-Electric Drivetrain | $14M | Opens EV product line; policy score +3; brand perception ↑↑; conversion rate +0.04% | Fuel Efficiency Upgrade |
+| Full Autonomy Certification | $18M | Maximum demand across tech/safety/premium segments; conversion rate +0.06%; 3-year exclusivity window | Autonomous Flight Systems **+** All-Electric Drivetrain *(cross-path)* |
+| Market Dominance System | $10M | Reveals competitor decision summaries each round (vehicle types, regional allocation, production volume); 2-year exclusivity | Demand Forecasting AI **+** Competitive Intelligence Suite *(cross-path)* |
+
+---
+
+**Notes:**
+- The cross-path requirements for Tier 4 pinnacle unlocks (Full Autonomy Certification, Market Dominance System) force teams to invest across multiple paths rather than going deep on one. These are the hardest unlocks in the game to reach.
+- Manufacturing efficiency stages are the only repeatable investment in the tech tree — each stage must be purchased before the next is available.
+- All-Electric Drivetrain is required for Full Autonomy Certification, making the green tech path a prerequisite for the highest-demand product in the game. Teams that skip it cannot reach the pinnacle.
 
 ---
 
 ### 5.5 Policy / Lobbying
 
-**Policy Score**: -50 to +50, shared across all players, persistent.
+**Policy Score**: **-20 to +20**, shared across all players, persistent.
 
-Traditional car NPC lobby contributes **-3 points/year automatically**.
+Traditional car NPC lobby contributes **-3 points/year automatically**. At this scale, the NPC covers 15% of the full range in a single year — without collective player investment in lobbying, the score drifts meaningfully negative within 2–3 rounds.
 
 | Score | Effect |
 |---|---|
-| -50 | Flying cars outlawed — flying car sales = 0 |
-| -40 | Severe purchase restrictions; 30% tax on all flying car sales |
-| -30 | Personal liability for all accidents; insurance costs ↑↑ |
-| -20 | Sweeping regulations; compliance costs ↑; demand ↓ |
-| -10 | Incentives to buy traditional cars |
+| -20 | Flying cars effectively outlawed — sales = 0; game-ending if sustained |
+| -15 | Severe purchase tax (25% on all flying car sales); demand ↓↓↓ |
+| -10 | Personal liability for accidents; insurance costs ↑↑; demand ↓↓ |
+| -5 | Government incentives to buy traditional cars; flying car demand ↓ |
 | 0 | No change |
-| +10 | Tax breaks for flying car purchases; demand ↑ |
-| +20 | Loosened airspace restrictions; demand ↑↑ |
-| +30 | Government research grants; R&D costs -20% for all |
-| +40 | Heavy taxation on traditional cars; demand ↑↑↑ |
-| +50 | Traditional cars effectively banned in key urban zones |
+| +5 | Tax breaks for flying car purchases; demand ↑; conversion rate ↑ |
+| +10 | Loosened airspace restrictions; new corridors opening; demand ↑↑ |
+| +15 | Government R&D grants; all teams' R&D costs -15%; demand ↑↑ |
+| +20 | Heavy traditional car taxation + urban zone restrictions; demand ↑↑↑; conversion rate ↑↑ |
 
 **Lobbying mechanics:**
-- Each $1M → +1 policy point (diminishing returns: above $10M/round, each additional $2M = +1 point)
-- All players' lobbying is **aggregated** — the net change moves the shared dial
+- Each $1M → +1 policy point (first $5M/round)
+- Diminishing returns above $5M: each additional $2M = +1 point (up to $15M total equivalent)
+- All players' lobbying is **aggregated** each round — the net change (player spending minus NPC's -3) moves the shared dial
 - Lobbying also **weights the world event pool** (see Section 9)
-- Players can lobby in either direction (pro or anti-flying car); anti-flying lobbying is rare but theoretically available as sabotage
+- Anti-flying lobbying is removed — spending against the industry you're in is thematically incoherent and strategically dominated
 
 ---
 
@@ -555,10 +667,18 @@ Repair revenue compounds quietly as your installed base grows — even a small f
 
 ### 8.4 Inventory
 
-Unsold units carry over to the following year with storage and depreciation costs.
+Unsold units carry over to the following year with storage and depreciation costs. Carrying costs vary by vehicle type — larger vehicles require more floor space, specialized storage, and higher depreciation exposure.
+
+| Type | Carrying Cost / Unit / Year | Notes |
+|---|---|---|
+| Compact | $600 | Small footprint; easiest to store |
+| Sedan | $800 | Standard |
+| SUV | $1,100 | Large footprint; climate control required |
+| Truck | $1,200 | Oversized storage bays; utility exposure |
+| Sports Car | $1,500 | Specialty storage; security; climate control; high depreciation risk |
 
 ```
-Annual Inventory Carrying Cost = Unsold_Units × $800/unit
+Annual Inventory Carrying Cost = Σ (Unsold_Units_by_Type × Carrying_Cost_for_Type)
 ```
 
 Inventory can be sold in the following year but at **reduced demand priority** — buyers prefer current-year models. Teams may choose to **discount inventory** (reduce price on unsold stock) to move it faster; discounting below market average carries the same cheapness signal as regular underpricing for that segment.
@@ -590,17 +710,17 @@ This makes capacity decisions feel consequential in both directions — overprod
 
 | Category | Favored by Policy Score | Examples |
 |---|---|---|
-| Regulatory / Pro-Flying | Policy > +10 | FAA corridor opens, airspace deregulation, tax credits |
-| Regulatory / Anti-Flying | Policy < -10 | Accident liability law, purchase tax, safety mandate |
+| Regulatory / Pro-Flying | Policy > +5 | FAA corridor opens, airspace deregulation, tax credits |
+| Regulatory / Anti-Flying | Policy < -5 | Accident liability law, purchase tax, safety mandate |
 | Economic | Any | Recession, boom, interest rate shift |
 | Technological | High R&D investment across players | Battery breakthrough, rare earth shortage, supply chain disruption |
 | Competitive | Any | NPC traditional car price war, new foreign flying car entrant |
 | Environmental | Any | Wildlife protection law, noise ordinance, green mandate |
-| Opportunity | Policy > +20 | Government contract tender, tech company partnership bid |
+| Opportunity | Policy > +12 | Government contract tender, tech company partnership bid |
 
 ### Lobbying Steering Mechanic
 
-- A team that has spent **$8M+ on lobbying** in the current round can flag **one preferred event category**
+- A team that has spent **$6M+ on lobbying** in the current round can flag **one preferred event category**
 - If that category is drawn (weighted by policy), the specific event within it is more favorable to that team
 - Not guaranteed — it's influence, not control
 - Multiple teams can flag preferences; the most-invested team's preference wins ties
@@ -609,15 +729,15 @@ This makes capacity decisions feel consequential in both directions — overprod
 
 | Event | Category | Policy Trigger | Effect |
 |---|---|---|---|
-| FAA Opens Urban Test Corridors | Regulatory/Pro | Policy ≥ 0 | Flying car demand +5%; policy +3 |
+| FAA Opens Urban Test Corridors | Regulatory/Pro | Policy ≥ 0 | Flying car demand +5%; policy +2 |
 | Major Flying Car Crash (NPC) | Regulatory/Anti | Any | All-market demand -8%; safety R&D value ↑; recall risk +5% for low-quality builders |
 | Rare Earth Shortage | Technological | Any | Manufacturing cost +12% all teams; lasts 1 year |
 | Recession | Economic | Any | Overall demand -15%; price sensitivity ↑ across all segments |
-| EV Tax Credit Expansion | Regulatory/Pro | Policy ≥ +10 | All-electric unlock cost -40%; EV demand +10% |
+| EV Tax Credit Expansion | Regulatory/Pro | Policy ≥ +5 | All-electric unlock cost -40%; EV demand +10% |
 | Traditional Automaker Price War | Competitive | Any | Traditional car demand recovers +5%; flying car demand -3% |
-| Urban Air Mobility Corridor Opens (Northeast) | Opportunity | Policy ≥ +15 | Northeast demand +20%; compact/sedan ↑ |
-| Wildlife Protection Regulations | Environmental | Any | Flying cars require new compliance module (+$1,200/unit cost); policy -5 |
-| Government Fleet Contract (Opportunity) | Opportunity | Policy ≥ +20 | Teams can bid; winner gets 500-unit government order at fixed price |
+| Urban Air Mobility Corridor Opens (Northeast) | Opportunity | Policy ≥ +10 | Northeast demand +20%; compact/sedan ↑ |
+| Wildlife Protection Regulations | Environmental | Any | Flying cars require new compliance module (+$1,200/unit cost); policy -3 |
+| Government Fleet Contract (Opportunity) | Opportunity | Policy ≥ +12 | Teams can bid; winner gets 500-unit government order at fixed price |
 | Foreign Flying Car Entrant | Competitive | Any | New NPC competitor enters one region with cheap product; price pressure ↑ |
 | Battery Breakthrough | Technological | High R&D env | All-electric manufacturing cost -20%; fuel efficiency upgrade cost -30% |
 | Insurance Industry Lobbies Against Flying Cars | Regulatory/Anti | Policy < +10 | Insurance costs ↑ for buyers; demand -5%; policy -3 |
@@ -777,7 +897,7 @@ The leaderboard (Valuation, Revenue, CAGR, Market Share, Brand Score) publishes 
 | 2 | Teams decide production quantity + regional allocation | ✅ |
 | 3 | World events are random pool, policy-weighted | ✅ |
 | 4 | Growth Multiplier uses CAGR (Year 2 → current year); CAGR also shown on leaderboard | ✅ |
-| 5 | Total market = 18M; category marketing threshold = $1M per +0.01 exponent | ✅ |
+| 5 | Total market = 18.3M (18M traditional + 300K flying); category marketing adds to organic growth exponent | ✅ |
 | 6 | Two perception systems: Public (industry, starts at 30 for flying cars) + Brand (company, starts at 0) | ✅ |
 | 7 | Public Perception feeds into Policy: every 10 pts above 0 → +2 policy points | ✅ |
 | 8 | Car type demand matrix locked (Year 1 by type × region); type growth modifiers defined | ✅ |
@@ -789,9 +909,14 @@ The leaderboard (Valuation, Revenue, CAGR, Market Share, Brand Score) publishes 
 | 14 | Attack ads: included, with 20% backfire risk | ✅ |
 | 15 | Repair revenue: included; reliability score bridges parts quality → brand perception; recalls are public | ✅ |
 | 16 | Technology licensing: Phase 2 | ✅ |
-| 17 | Inventory carries over at $800/unit/year; unmet demand reported to teams after each round | ✅ |
+| 17 | Inventory carrying costs tiered by vehicle type ($600–$1,500/unit/year); unmet demand reported after each round | ✅ |
 | 18 | Foreign NPC competitor: world event only; traditional car lobby is sufficient permanent NPC pressure | ✅ |
 | 19 | Anti-flying lobbying: dropped — thematically incoherent, strategically dominated by pro-flying spend | ✅ |
+| 20 | Policy scale: -20 to +20; NPC lobby -3/year; diminishing returns above $5M/round | ✅ |
+| 21 | Demand growth: two-source model (organic 3% base + 0.1% traditional market conversion); 16.18% annual cap | ✅ |
+| 22 | R&D: 4-tier tech tree (16 one-time unlocks) + recurring investments; cross-path prereqs for pinnacle unlocks | ✅ |
+| 23 | Year 1 Market Briefing: distributed before decisions; includes demand totals, public perception, policy baseline | ✅ |
+| 24 | Brand and model naming: team-controlled, profanity-filtered, character-limited | ✅ |
 
 ---
 
