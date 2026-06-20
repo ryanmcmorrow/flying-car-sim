@@ -11,3 +11,192 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  FACILITATOR
+  PLAYER
+}
+
+enum GameStatus {
+  LOBBY
+  ACTIVE
+  COMPLETED
+}
+
+enum RoundStatus {
+  PENDING
+  OPEN
+  RESOLVED
+}
+
+enum TeamMemberRole {
+  CEO
+  CFO
+  CMO
+  CTO
+  COO
+}
+
+enum VehicleType {
+  COMPACT
+  SEDAN
+  SUV
+  TRUCK
+  SPORTS_CAR
+}
+
+enum Region {
+  WEST_COAST
+  NORTHEAST
+  SOUTHEAST
+  MIDWEST
+  SOUTHWEST
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole @default(PLAYER)
+  createdAt    DateTime @default(now())
+
+  facilitatedGames Game[]
+  teamMemberships  TeamMember[]
+}
+
+model Game {
+  id           String     @id @default(cuid())
+  code         String     @unique @db.Char(6)
+  status       GameStatus @default(LOBBY)
+  currentRound Int        @default(1)
+  facilitatorId String
+  facilitator  User       @relation(fields: [facilitatorId], references: [id])
+  /// Facilitator config: economic conditions, scenario settings, etc.
+  settings     Json       @default("{}")
+  createdAt    DateTime   @default(now())
+
+  teams  Team[]
+  rounds Round[]
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  brandName String   @db.VarChar(30)
+  /// Starting cash: $100,000,000
+  cash      Decimal  @default(100000000) @db.Decimal(18, 2)
+  createdAt DateTime @default(now())
+
+  members       TeamMember[]
+  decisions     Decision[]
+  roundResults  RoundResult[]
+  rdUnlocks     RdUnlock[]
+  installedBases InstalledBase[]
+}
+
+model TeamMember {
+  id       String         @id @default(cuid())
+  teamId   String
+  team     Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User           @relation(fields: [userId], references: [id])
+  role     TeamMemberRole
+  joinedAt DateTime       @default(now())
+
+  @@unique([teamId, role])
+  @@unique([teamId, userId])
+}
+
+model Round {
+  id           String      @id @default(cuid())
+  gameId       String
+  game         Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  roundNumber  Int
+  status       RoundStatus @default(PENDING)
+  /// World event drawn at round open; null until round is opened
+  worldEvent   Json?
+  openedAt     DateTime?
+  resolvedAt   DateTime?
+
+  decisions    Decision[]
+  roundResults RoundResult[]
+
+  @@unique([gameId, roundNumber])
+}
+
+model Decision {
+  id     String @id @default(cuid())
+  roundId String
+  round  Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  /// CFO / manufacturing section
+  manufacturingSection Json @default("{}")
+  /// CTO / vehicle design section
+  vehicleSection       Json @default("{}")
+  /// CTO / R&D section
+  rdSection            Json @default("{}")
+  /// COO / lobbying section
+  lobbyingSection      Json @default("{}")
+  /// CMO / marketing section
+  marketingSection     Json @default("{}")
+  /// CEO / production allocation section
+  productionSection    Json @default("{}")
+
+  /// Null until CEO explicitly submits; once set, the round is locked for this team
+  submittedAt DateTime?
+
+  @@unique([roundId, teamId])
+}
+
+model RoundResult {
+  id      String @id @default(cuid())
+  roundId String
+  round   Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  teamId  String
+  team    Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  /// Per-team financials and market results for this round
+  /// Shape: { unitsSold, revenue, cogs, grossProfit, repairRevenue,
+  ///          inventoryCarryingCost, netIncome, brandPerceptionDelta,
+  ///          newBrandPerception, valuation, cagr, marketShare,
+  ///          unitsUnsold, unmetDemand }
+  teamResult Json
+
+  /// Industry-level snapshot (denormalized per team for query convenience)
+  /// Shape: { policyScore, publicPerception, totalFlyingCarDemand, totalTraditionalDemand }
+  industrySnapshot Json
+
+  @@unique([roundId, teamId])
+}
+
+model RdUnlock {
+  id                String  @id @default(cuid())
+  teamId            String
+  team              Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  /// One of the 16 tech tree unlock keys (e.g. "autonomous_level_3", "composite_frame", etc.)
+  unlockKey         String
+  unlockedInRound   Int
+  /// Null after exclusivity window expires
+  exclusiveUntilRound Int?
+
+  @@unique([teamId, unlockKey])
+}
+
+model InstalledBase {
+  id          String      @id @default(cuid())
+  teamId      String
+  team        Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  vehicleType VehicleType
+  /// Cumulative units sold of this vehicle type (used for repair revenue calculation)
+  units       Int         @default(0)
+
+  @@unique([teamId, vehicleType])
+}
