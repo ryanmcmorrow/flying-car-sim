@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ROLE_DESCRIPTIONS, ROLE_COLORS } from "@/lib/game-utils";
+import type { MarketBriefing } from "@/lib/game-utils";
 import type { TeamMemberRole } from "@/app/generated/prisma/client";
 
 interface TeamMember {
@@ -26,14 +27,6 @@ interface GameData {
   playerName: string;
 }
 
-interface MarketBriefing {
-  totalFlyingCarDemand: number;
-  demandByType: Record<string, number>;
-  publicPerception: number;
-  policyScore: number;
-  economicCondition: string;
-  npcLobbyingNote: string;
-}
 
 interface WorldEvent {
   id: string;

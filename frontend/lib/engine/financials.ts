@@ -16,7 +16,7 @@ import {
 } from "./constants";
 import type { VehicleType } from "./constants";
 import type { TeamInput } from "./types";
-import { computeModelUnitCost } from "@/lib/decision-utils";
+import { computeModelUnitCost, computeEngineeringFee } from "@/lib/decision-utils";
 
 // ── R&D spend computation ─────────────────────────────────────────────────────
 
@@ -281,28 +281,10 @@ export function computeInventoryCarryingCost(
 // ── Engineering fees ──────────────────────────────────────────────────────────
 
 export function computeEngineeringFeesForTeam(team: TeamInput): number {
-  const ENGINEERING_FEES: Record<VehicleType, number> = {
-    COMPACT: 3_000_000,
-    SEDAN: 4_000_000,
-    SUV: 5_000_000,
-    TRUCK: 5_000_000,
-    SPORTS_CAR: 6_000_000,
-  };
-
   let total = 0;
   for (const model of team.vehicleSection.models) {
     if (model.isNewDesign) {
-      // Check if this type exists in the team's installed base
-      // If it's a new design for a type they don't currently have, charge fee
-      const installedCount = team.installedBase[model.vehicleType] ?? 0;
-      if (installedCount === 0) {
-        total += ENGINEERING_FEES[model.vehicleType] ?? 0;
-      }
-      // Even if they have an installed base, isNewDesign means they're redesigning
-      // Per spec: if isNewDesign=true, add engineering fee
-      else {
-        total += ENGINEERING_FEES[model.vehicleType] ?? 0;
-      }
+      total += computeEngineeringFee(model.vehicleType);
     }
   }
   return total;

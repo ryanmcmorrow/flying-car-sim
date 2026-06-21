@@ -923,24 +923,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
   }
 
   // Public R&D achievements
-  const UNLOCK_DISPLAY_NAMES: Record<string, string> = {
-    mfg_efficiency_1: "Manufacturing Efficiency I",
-    mfg_efficiency_2: "Manufacturing Efficiency II",
-    mfg_efficiency_3: "Manufacturing Efficiency III",
-    mfg_mastery: "Manufacturing Mastery",
-    advanced_aerodynamics: "Advanced Aerodynamics",
-    fly_by_wire: "Fly-By-Wire",
-    battery_research: "Battery Research",
-    market_analytics: "Market Analytics",
-    competitive_intel: "Competitive Intel",
-    fuel_cell_research: "Fuel Cell Research",
-    autonomous_flight: "Autonomous Flight",
-    fuel_efficiency: "Fuel Efficiency",
-    demand_forecasting_ai: "Demand Forecasting AI",
-    all_electric: "All Electric",
-    full_autonomy: "Full Autonomy",
-    market_dominance: "Market Dominance",
-  };
+  const UNLOCK_DISPLAY_NAMES = Object.fromEntries(TECH_TREE_DEF.map((n) => [n.key, n.name]));
 
   // Only reveal non-secret unlocks publicly
   const secretUnlocks = new Set([

@@ -30,9 +30,9 @@ export function getEmptyRdSection(): RdSection {
 
 export function getEmptyManufacturingSection(): ManufacturingSection {
   return {
-    spaceAction: "new",
-    spaceSize: "small",
-    spaceOwnership: "rent",
+    spaceAction: "keep",
+    spaceSize: undefined,
+    spaceOwnership: undefined,
     productionRuns: [],
   };
 }

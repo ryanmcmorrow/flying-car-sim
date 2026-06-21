@@ -275,7 +275,7 @@ export async function POST(
       output.nextRoundSettings.policyScore,
       steeringTeams
     );
-    nextWorldEvent = JSON.parse(JSON.stringify(nextEvent));
+    nextWorldEvent = structuredClone(nextEvent) as unknown as Record<string, unknown>;
   }
 
   // ── Write DB in a transaction ──────────────────────────────────────────────────
@@ -301,20 +301,12 @@ export async function POST(
           create: {
             roundId: currentRound.id,
             teamId: team.id,
-            teamResult: JSON.parse(
-              JSON.stringify(teamResult)
-            ) as Prisma.InputJsonValue,
-            industrySnapshot: JSON.parse(
-              JSON.stringify(industrySnapshot)
-            ) as Prisma.InputJsonValue,
+            teamResult: structuredClone(teamResult) as unknown as Prisma.InputJsonValue,
+            industrySnapshot: structuredClone(industrySnapshot) as unknown as Prisma.InputJsonValue,
           },
           update: {
-            teamResult: JSON.parse(
-              JSON.stringify(teamResult)
-            ) as Prisma.InputJsonValue,
-            industrySnapshot: JSON.parse(
-              JSON.stringify(industrySnapshot)
-            ) as Prisma.InputJsonValue,
+            teamResult: structuredClone(teamResult) as unknown as Prisma.InputJsonValue,
+            industrySnapshot: structuredClone(industrySnapshot) as unknown as Prisma.InputJsonValue,
           },
         })
       );
@@ -381,12 +373,10 @@ export async function POST(
   );
 
   // 6. Update Game.settings
-  const newSettings = JSON.parse(
-    JSON.stringify({
-      ...settings,
-      ...output.nextRoundSettings,
-    })
-  ) as Prisma.InputJsonValue;
+  const newSettings = structuredClone({
+    ...settings,
+    ...output.nextRoundSettings,
+  }) as Prisma.InputJsonValue;
 
   if (!isLastRound) {
     transactionOps.push(

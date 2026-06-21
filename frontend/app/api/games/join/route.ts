@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { TeamMemberRole } from "@/app/generated/prisma/client";
-import { ALL_ROLES, slugify } from "@/lib/game-utils";
+import { ALL_ROLES } from "@/lib/game-utils";
 import bcrypt from "bcryptjs";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Filter = require("bad-words");
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
   const passwordHash = await bcrypt.hash(ephemeralPassword, 10);
 
   // Generate unique email
-  const slug = slugify(cleanName);
+  const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 20);
   const suffix = Math.random().toString(36).slice(2, 8);
   const email = `${slug}-${suffix}@player.local`;
 

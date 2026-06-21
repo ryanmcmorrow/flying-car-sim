@@ -11,6 +11,7 @@ import type {
   LobbyingSection,
   SectionKey,
 } from "@/types/decisions";
+import { ROLE_COLORS } from "@/lib/game-utils";
 import type { MarketBriefing } from "@/lib/game-utils";
 import { VehicleSection as VehicleSectionComp } from "@/components/game/sections/VehicleSection";
 import { RdSection as RdSectionComp } from "@/components/game/sections/RdSection";
@@ -49,13 +50,6 @@ interface DecisionRoomProps {
   briefing: MarketBriefing | null;
 }
 
-const ROLE_COLORS: Record<TeamMemberRole, string> = {
-  CEO: "#ffbe0b",
-  CFO: "#39ff14",
-  CMO: "#ff006e",
-  CTO: "#00f5ff",
-  COO: "#c77dff",
-};
 
 const ALL_TABS: { role: TeamMemberRole; label: string }[] = [
   { role: "CEO", label: "CEO" },

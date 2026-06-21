@@ -22,18 +22,12 @@ export function lobbyingSpendToPoints(spend: number): number {
 
 // ── Compute new policy score ──────────────────────────────────────────────────
 
-export interface PolicyUpdateResult {
-  newPolicyScore: number;
-  totalPlayerPts: number;
-  netPolicyChange: number;
-}
-
 export function computePolicyScoreUpdate(
   teams: TeamInput[],
   currentPolicyScore: number,
   perceptionPolicyBonusPending: number,
   newAllElectricTeams: string[] // team IDs that just unlocked all_electric THIS round
-): PolicyUpdateResult {
+): { newPolicyScore: number; totalPlayerPts: number; netPolicyChange: number } {
   let totalPlayerPts = 0;
 
   for (const team of teams) {
