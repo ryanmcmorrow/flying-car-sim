@@ -11,11 +11,8 @@ export async function POST(
 ) {
   const { id } = await params;
   const session = await auth();
-  if (!session) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (session.user.role !== "FACILITATOR") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const game = await db.game.findUnique({
@@ -30,6 +27,8 @@ export async function POST(
   if (!game) {
     return NextResponse.json({ error: "Game not found" }, { status: 404 });
   }
+  // Auth: must be the game's facilitator (by ID). Role check skipped for
+  // Party Mode hosts who appear in the player lobby with FACILITATOR user role.
   if (game.facilitatorId !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
