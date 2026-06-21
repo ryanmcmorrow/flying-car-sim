@@ -58,6 +58,17 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
   const [justResolved, setJustResolved] = useState<number | null>(null);
+  const [kicking, setKicking] = useState<string | null>(null);
+
+  async function handleKick(teamId: string) {
+    setKicking(teamId);
+    try {
+      await fetch(`/api/games/${game.id}/kick?teamId=${teamId}`, { method: "DELETE" });
+      await refreshGame();
+    } finally {
+      setKicking(null);
+    }
+  }
 
   const hasCEO = game.teams.some((t) =>
     t.members.some((m) => m.role === "CEO")
@@ -432,6 +443,16 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
                         <span style={{ fontSize: "0.9rem", color: "#4a4a6a" }}>
                           {team.members.length}/5 MEMBERS
                         </span>
+                        {game.status === "LOBBY" && (
+                          <button
+                            type="button"
+                            onClick={() => handleKick(team.id)}
+                            disabled={kicking === team.id}
+                            style={{ fontFamily: pxFont, fontSize: "0.4rem", color: "#ff006e", border: "2px solid #ff006e", background: "transparent", padding: "0.2rem 0.5rem", cursor: "pointer" }}
+                          >
+                            {kicking === team.id ? "..." : "KICK"}
+                          </button>
+                        )}
                       </div>
                     </div>
 
