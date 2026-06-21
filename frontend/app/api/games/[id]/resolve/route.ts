@@ -24,7 +24,13 @@ export async function POST(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const result = await resolveGameById(id);
+  let result;
+  try {
+    result = await resolveGameById(id);
+  } catch (err) {
+    console.error("[resolve] unexpected error:", err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
 
   return NextResponse.json({

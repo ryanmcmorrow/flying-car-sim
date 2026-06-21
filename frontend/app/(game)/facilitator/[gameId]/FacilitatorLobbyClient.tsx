@@ -134,8 +134,8 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
       if (body.gameComplete) {
         router.push(`/results/${game.id}/${roundBeingResolved}`);
       }
-    } catch {
-      setResolveError("CONNECTION ERROR");
+    } catch (err) {
+      setResolveError("CONNECTION ERROR: " + String(err));
     } finally {
       setResolving(false);
     }
