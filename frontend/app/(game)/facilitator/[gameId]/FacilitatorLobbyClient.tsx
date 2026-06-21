@@ -166,7 +166,7 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
       <div className="max-w-4xl mx-auto px-4 py-8 relative" style={{ zIndex: 1 }}>
         {/* Back */}
         <Link
-          href="/game/facilitator"
+          href="/facilitator"
           style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#4a4a6a", textDecoration: "none" }}
         >
           ← COMMAND CENTER

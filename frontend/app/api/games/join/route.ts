@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
       // Ephemeral password returned so client can immediately signIn()
       // This will be replaced with a proper invite flow in Sprint 7.
       ephemeralPassword,
-      redirectTo: `/game/lobby/${game.id}`,
+      redirectTo: `/lobby/${game.id}`,
     },
     { status: 201 }
   );

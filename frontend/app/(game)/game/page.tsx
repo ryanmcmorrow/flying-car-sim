@@ -10,7 +10,7 @@ export default async function GameIndexPage() {
   }
 
   if (session.user.role === "FACILITATOR") {
-    redirect("/game/facilitator");
+    redirect("/facilitator");
   }
 
   // Player: find their active team/game and redirect to lobby
@@ -21,7 +21,7 @@ export default async function GameIndexPage() {
   });
 
   if (membership) {
-    redirect(`/game/lobby/${membership.team.gameId}`);
+    redirect(`/lobby/${membership.team.gameId}`);
   }
 
   // No game found — redirect to join

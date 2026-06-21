@@ -32,7 +32,7 @@ export default async function FacilitatorGameLobbyPage({ params }: Props) {
   });
 
   if (!game || game.facilitatorId !== session.user.id) {
-    redirect("/game/facilitator");
+    redirect("/facilitator");
   }
 
   const gameData = {

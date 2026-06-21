@@ -177,7 +177,7 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
               YOUR GAMES ({gameList.length})
             </p>
             {gameList.map((game) => (
-              <Link key={game.id} href={`/game/facilitator/${game.id}`} style={{ display: "block" }}>
+              <Link key={game.id} href={`/facilitator/${game.id}`} style={{ display: "block" }}>
                 <div
                   className="pixel-card"
                   style={{
@@ -403,7 +403,7 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
                   </button>
                   {newGameId && (
                     <Link
-                      href={`/game/facilitator/${newGameId}`}
+                      href={`/facilitator/${newGameId}`}
                       className="pixel-btn pixel-btn-green text-center"
                       style={{ fontSize: "0.5rem", flex: 1, textDecoration: "none" }}
                     >
