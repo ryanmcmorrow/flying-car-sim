@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
     id: game.id,
     code: game.code,
     status: game.status,
+    mode: game.mode,
     teams: game.teams.map((t) => ({
       id: t.id,
       brandName: t.brandName,

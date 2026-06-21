@@ -58,6 +58,11 @@ export default async function PlayerLobbyPage({ params }: Props) {
     mode: game.mode as string,
     isHost,
     settings: game.settings as Record<string, unknown>,
+    allTeams: game.teams.map((t) => ({
+      id: t.id,
+      brandName: t.brandName,
+      members: t.members.map((m) => ({ id: m.id, role: m.role as string, userName: m.user.name })),
+    })),
     myTeam: {
       id: myTeam.id,
       brandName: myTeam.brandName,

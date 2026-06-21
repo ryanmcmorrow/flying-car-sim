@@ -12,6 +12,12 @@ interface TeamMember {
   userName: string;
 }
 
+interface LobbyTeam {
+  id: string;
+  brandName: string;
+  members: { id: string; role: string; userName: string }[];
+}
+
 interface GameData {
   id: string;
   code: string;
@@ -20,6 +26,7 @@ interface GameData {
   mode: string;
   isHost: boolean;
   settings: Record<string, unknown>;
+  allTeams: LobbyTeam[];
   myTeam: {
     id: string;
     brandName: string;
@@ -72,6 +79,7 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
         status: data.status,
         currentRound: data.currentRound,
         settings: data.settings,
+        allTeams: data.teams ?? prev.allTeams,
         myTeam: updatedTeam ?? prev.myTeam,
       }));
 
@@ -91,6 +99,17 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
 
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState("");
+  const [kicking, setKicking] = useState<string | null>(null);
+
+  async function handleKick(teamId: string) {
+    setKicking(teamId);
+    try {
+      await fetch(`/api/games/${gameData.id}/kick?teamId=${teamId}`, { method: "DELETE" });
+      await refreshGame();
+    } finally {
+      setKicking(null);
+    }
+  }
 
   async function handleStart() {
     setStartError("");
@@ -185,17 +204,21 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
               background: `${myRoleColor}11`,
             }}
           >
-            <p
-              style={{
-                fontFamily: "var(--font-pixel), monospace",
-                fontSize: "0.55rem",
-                color: myRoleColor,
-                marginBottom: "0.3rem",
-              }}
-            >
-              YOUR ROLE: {gameData.myRole}
-            </p>
-            <p style={{ fontSize: "1rem", color: "#cccccc" }}>{myRoleDesc}</p>
+            {gameData.mode === "PARTY" ? (
+              <>
+                <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.55rem", color: "#ff006e", marginBottom: "0.3rem" }}>
+                  ⚡ SOLO FOUNDER — FULL EXEC TEAM
+                </p>
+                <p style={{ fontSize: "1rem", color: "#cccccc" }}>You control all departments: vehicles, R&D, manufacturing, pricing, marketing, and lobbying.</p>
+              </>
+            ) : (
+              <>
+                <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.55rem", color: myRoleColor, marginBottom: "0.3rem" }}>
+                  YOUR ROLE: {gameData.myRole}
+                </p>
+                <p style={{ fontSize: "1rem", color: "#cccccc" }}>{myRoleDesc}</p>
+              </>
+            )}
           </div>
         </div>
 
@@ -248,18 +271,52 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
 
         {/* Status section */}
         {gameData.status === "LOBBY" && gameData.isHost && (
-          <div className="pixel-card text-center py-6" style={{ borderColor: "#ff006e", boxShadow: "4px 4px 0 #7d0030" }}>
-            <p className="pixel-heading mb-3" style={{ fontSize: "0.55rem", color: "#ff006e" }}>🎉 PARTY HOST CONTROLS</p>
-            <p style={{ fontSize: "1rem", color: "#888899", marginBottom: "1.5rem" }}>
-              Everyone in? Hit launch to start the 8-minute round timer.
-            </p>
-            {startError && (
-              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.45rem", color: "#ff006e", marginBottom: "1rem" }}>❌ {startError}</p>
-            )}
-            <button onClick={handleStart} disabled={starting} className="pixel-btn pixel-btn-pink" style={{ fontSize: "0.55rem" }}>
-              {starting ? "LAUNCHING..." : "⚡ LAUNCH GAME"}
-            </button>
-          </div>
+          <>
+            {/* All parties roster with kick buttons */}
+            <div className="pixel-card mb-4" style={{ borderColor: "#4a4a6a" }}>
+              <p className="pixel-label mb-3">ALL PARTIES IN LOBBY ({gameData.allTeams.length})</p>
+              {gameData.allTeams.length === 0 ? (
+                <p style={{ fontSize: "1rem", color: "#4a4a6a" }}>No players yet. Share the game code!</p>
+              ) : (
+                <div className="space-y-2">
+                  {gameData.allTeams.map((t) => (
+                    <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.4rem 0.5rem", border: "2px solid #2a2a3a" }}>
+                      <div>
+                        <span style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.5rem", color: "#ffbe0b" }}>{t.brandName}</span>
+                        <span style={{ fontSize: "0.9rem", color: "#666677", marginLeft: "0.5rem" }}>
+                          {t.members.map((m) => m.userName).join(", ")}
+                        </span>
+                      </div>
+                      {t.id !== gameData.myTeam.id && (
+                        <button
+                          type="button"
+                          onClick={() => handleKick(t.id)}
+                          disabled={kicking === t.id}
+                          style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.4rem", color: "#ff006e", border: "2px solid #ff006e", background: "transparent", padding: "0.2rem 0.4rem", cursor: "pointer" }}
+                        >
+                          {kicking === t.id ? "..." : "KICK"}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Launch controls */}
+            <div className="pixel-card text-center py-6" style={{ borderColor: "#ff006e", boxShadow: "4px 4px 0 #7d0030" }}>
+              <p className="pixel-heading mb-3" style={{ fontSize: "0.55rem", color: "#ff006e" }}>⚡ HOST CONTROLS</p>
+              <p style={{ fontSize: "1rem", color: "#888899", marginBottom: "1.5rem" }}>
+                Everyone in? Hit launch to start the 8-minute round timer.
+              </p>
+              {startError && (
+                <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.45rem", color: "#ff006e", marginBottom: "1rem" }}>❌ {startError}</p>
+              )}
+              <button onClick={handleStart} disabled={starting} className="pixel-btn pixel-btn-pink" style={{ fontSize: "0.55rem" }}>
+                {starting ? "LAUNCHING..." : "⚡ LAUNCH GAME"}
+              </button>
+            </div>
+          </>
         )}
 
         {gameData.status === "LOBBY" && !gameData.isHost && (

@@ -121,6 +121,7 @@ export default async function PlayPage({ params }: PageProps) {
         code: game.code,
         currentRound: game.currentRound,
         status: game.status,
+        mode: game.mode,
       }}
       round={{
         id: round.id,

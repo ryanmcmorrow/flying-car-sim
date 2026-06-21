@@ -48,9 +48,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  if (!role || !ALL_ROLES.includes(role as TeamMemberRole)) {
-    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
-  }
+  // Role validated after game mode is known (Party Mode forces CEO)
 
   // ── Basic profanity check ──
   const { Filter } = await import("bad-words");
@@ -59,7 +57,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "INAPPROPRIATE CONTENT DETECTED" }, { status: 400 });
   }
 
-  const chosenRole = role as TeamMemberRole;
   const cleanName = playerName.trim();
   const cleanBrand = brandName.trim();
 
@@ -85,13 +82,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // In Party Mode each player runs solo as CEO; role param is ignored
+  const isParty = game.mode === "PARTY";
+  const chosenRole: TeamMemberRole = isParty ? "CEO" : (role as TeamMemberRole);
+
+  if (!isParty && (!role || !ALL_ROLES.includes(role as TeamMemberRole))) {
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  }
+
   // ── Find or create team ──
   let team = game.teams.find(
     (t) => t.brandName.toLowerCase() === cleanBrand.toLowerCase()
   );
 
-  if (team) {
-    // Joining existing team — check role isn't taken
+  if (team && !isParty) {
+    // Classroom: joining existing team — check role isn't taken
     const roleTaken = team.members.some((m) => m.role === chosenRole);
     if (roleTaken) {
       return NextResponse.json(
@@ -99,6 +104,13 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+  }
+  if (team && isParty) {
+    // Party: brand name must be unique per player — don't allow joining someone else's company
+    return NextResponse.json(
+      { error: "BRAND NAME ALREADY TAKEN — CHOOSE A DIFFERENT NAME" },
+      { status: 400 }
+    );
   }
 
   // ── Create ephemeral user ──

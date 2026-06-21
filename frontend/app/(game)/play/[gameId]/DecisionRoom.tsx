@@ -27,7 +27,7 @@ type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
 interface DecisionRoomProps {
   gameId: string;
-  game: { id: string; code: string; currentRound: number; status: string };
+  game: { id: string; code: string; currentRound: number; status: string; mode: string };
   round: {
     id: string;
     roundNumber: number;

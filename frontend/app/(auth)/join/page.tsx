@@ -13,6 +13,7 @@ interface GameInfo {
   id: string;
   code: string;
   status: string;
+  mode: string;
   teams: {
     id: string;
     brandName: string;
@@ -108,11 +109,12 @@ export default function JoinPage() {
       setFormError("BRAND NAME MUST BE 2+ CHARACTERS");
       return;
     }
-    if (!selectedRole) {
+    const isParty = gameInfo?.mode === "PARTY";
+    if (!isParty && !selectedRole) {
       setFormError("SELECT A ROLE");
       return;
     }
-    if (takenRoles.includes(selectedRole)) {
+    if (!isParty && selectedRole && takenRoles.includes(selectedRole)) {
       setFormError("THAT ROLE IS ALREADY TAKEN ON THIS TEAM");
       return;
     }
@@ -127,7 +129,7 @@ export default function JoinPage() {
           code: gameInfo!.code,
           playerName: playerName.trim(),
           brandName: brandName.trim(),
-          role: selectedRole,
+          role: gameInfo!.mode === "PARTY" ? "CEO" : selectedRole,
         }),
       });
 
@@ -456,40 +458,36 @@ export default function JoinPage() {
                 </div>
               )}
 
-              <div>
-                <label className="pixel-label">PICK YOUR ROLE</label>
-                {brandName.trim().length < 2 ? (
-                  <p
-                    style={{
-                      fontSize: "1rem",
-                      color: "#4a4a6a",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    Enter a brand name first to see available roles.
+              {gameInfo?.mode === "PARTY" ? (
+                <div style={{ border: "2px solid #ff006e", background: "#1a000d", padding: "0.75rem" }}>
+                  <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.5rem", color: "#ff006e", marginBottom: "0.4rem" }}>
+                    ⚡ PARTY MODE — SOLO FOUNDER
                   </p>
-                ) : availableRoles.length === 0 ? (
-                  <div
-                    style={{
-                      border: "2px solid #ff006e",
-                      background: "#1a000d",
-                      padding: "0.75rem",
-                      fontFamily: "var(--font-pixel), monospace",
-                      fontSize: "0.5rem",
-                      color: "#ff006e",
-                    }}
-                  >
-                    ALL ROLES FILLED ON THIS TEAM
-                  </div>
-                ) : (
-                  <RoleSlots
-                    filledRoles={getExistingTeamMembers()}
-                    onSelect={(role) => setSelectedRole(role)}
-                    selectedRole={selectedRole}
-                    interactive
-                  />
-                )}
-              </div>
+                  <p style={{ fontSize: "1rem", color: "#888899" }}>
+                    You run the whole company. No role needed — you're CEO, CFO, CMO, CTO, and COO all at once.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="pixel-label">PICK YOUR ROLE</label>
+                  {brandName.trim().length < 2 ? (
+                    <p style={{ fontSize: "1rem", color: "#4a4a6a", fontStyle: "italic" }}>
+                      Enter a brand name first to see available roles.
+                    </p>
+                  ) : availableRoles.length === 0 ? (
+                    <div style={{ border: "2px solid #ff006e", background: "#1a000d", padding: "0.75rem", fontFamily: "var(--font-pixel), monospace", fontSize: "0.5rem", color: "#ff006e" }}>
+                      ALL ROLES FILLED ON THIS TEAM
+                    </div>
+                  ) : (
+                    <RoleSlots
+                      filledRoles={getExistingTeamMembers()}
+                      onSelect={(role) => setSelectedRole(role)}
+                      selectedRole={selectedRole}
+                      interactive
+                    />
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button
@@ -506,7 +504,7 @@ export default function JoinPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !selectedRole || brandName.trim().length < 2}
+                  disabled={loading || (gameInfo?.mode !== "PARTY" && !selectedRole) || brandName.trim().length < 2}
                   className="pixel-btn pixel-btn-green"
                   style={{ fontSize: "0.55rem", flex: 1 }}
                 >
