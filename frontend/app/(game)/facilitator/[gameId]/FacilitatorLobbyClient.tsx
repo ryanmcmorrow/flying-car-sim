@@ -39,6 +39,7 @@ interface GameData {
   code: string;
   status: "LOBBY" | "ACTIVE" | "COMPLETED";
   currentRound: number;
+  mode: string;
   settings: Record<string, unknown>;
   teams: Team[];
   rounds: Round[];
@@ -289,6 +290,19 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
                     {currentRoundData.status}
                   </span>
                 </div>
+
+                {/* Party Mode: play link */}
+                {game.mode === "PARTY" && (
+                  <div>
+                    <a
+                      href={`/play/${game.id}`}
+                      className="pixel-btn pixel-btn-green"
+                      style={{ fontSize: "0.5rem", display: "inline-block" }}
+                    >
+                      ▶ PLAY YOUR TURN
+                    </a>
+                  </div>
+                )}
 
                 {/* Resolve / Results */}
                 <div className="flex flex-col gap-2 items-end">

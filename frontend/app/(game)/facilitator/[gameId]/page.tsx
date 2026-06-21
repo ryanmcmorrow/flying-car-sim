@@ -40,6 +40,7 @@ export default async function FacilitatorGameLobbyPage({ params }: Props) {
     code: game.code,
     status: game.status as "LOBBY" | "ACTIVE" | "COMPLETED",
     currentRound: game.currentRound,
+    mode: game.mode as string,
     settings: game.settings as Record<string, unknown>,
     teams: game.teams.map((t) => ({
       id: t.id,
