@@ -223,24 +223,15 @@ export function DecisionRoom({
     setSubmittedAt(new Date().toISOString());
   }
 
-  // Save indicator text
-  function getSaveLabel() {
-    if (saveStatus === "saving") return "● SAVING...";
-    if (saveStatus === "error") return "✗ SAVE FAILED — retry?";
-    if (saveStatus === "saved" && savedAt) {
-      const secondsAgo = Math.floor((Date.now() - savedAt.getTime()) / 1000);
-      return `✓ SAVED ${secondsAgo < 5 ? "just now" : `${secondsAgo}s ago`}`;
-    }
-    if (saveStatus === "unsaved") return "● UNSAVED";
-    return "✓ SAVED";
-  }
-
-  function getSaveColor() {
-    if (saveStatus === "saving") return "var(--px-amber)";
-    if (saveStatus === "error") return "var(--px-pink)";
-    if (saveStatus === "unsaved") return "var(--px-amber)";
-    return "var(--px-green)";
-  }
+  const saveLabel =
+    saveStatus === "saving" ? "● SAVING..." :
+    saveStatus === "error" ? "✗ SAVE FAILED — retry?" :
+    saveStatus === "saved" && savedAt
+      ? `✓ SAVED ${Math.floor((Date.now() - savedAt.getTime()) / 1000) < 5 ? "just now" : `${Math.floor((Date.now() - savedAt.getTime()) / 1000)}s ago`}`
+    : saveStatus === "unsaved" ? "● UNSAVED" : "✓ SAVED";
+  const saveColor =
+    saveStatus === "saving" || saveStatus === "unsaved" ? "var(--px-amber)" :
+    saveStatus === "error" ? "var(--px-pink)" : "var(--px-green)";
 
   const isLocked = !!submittedAt;
 
@@ -438,10 +429,10 @@ export function DecisionRoom({
               style={{
                 fontFamily: "var(--font-pixel)",
                 fontSize: "0.42rem",
-                color: getSaveColor(),
+                color: saveColor,
               }}
             >
-              {getSaveLabel()}
+              {saveLabel}
             </span>
           </div>
         </div>

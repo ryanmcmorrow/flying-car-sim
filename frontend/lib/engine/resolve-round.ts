@@ -1012,7 +1012,6 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     industrySnapshot,
     newRdUnlocks,
     installedBaseUpdates,
-    updatedTeamSpaces,
     nextRoundSettings: {
       policyScore: newPolicyScore,
       publicPerception: newPublicPerception,
@@ -1050,7 +1049,6 @@ function buildEmptyOutput(input: ResolveRoundInput): ResolveRoundOutput {
     },
     newRdUnlocks: [],
     installedBaseUpdates: [],
-    updatedTeamSpaces: input.teamSpaces,
     nextRoundSettings: {
       policyScore: input.policyScore,
       publicPerception: input.publicPerception,
@@ -1145,7 +1143,6 @@ function buildZeroDemandOutput(input: ResolveRoundInput): ResolveRoundOutput {
     },
     newRdUnlocks: [],
     installedBaseUpdates: [],
-    updatedTeamSpaces: input.teamSpaces,
     nextRoundSettings: {
       policyScore: -20,
       publicPerception: input.publicPerception,

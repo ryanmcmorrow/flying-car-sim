@@ -28,13 +28,6 @@ interface GameData {
 }
 
 
-interface WorldEvent {
-  id: string;
-  title: string;
-  description: string;
-  effect: string;
-}
-
 interface Props {
   gameData: GameData;
 }
@@ -46,8 +39,6 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
   );
 
   const briefing = gameData.settings.year1Briefing as MarketBriefing | undefined;
-  const round1 = (gameData.settings as Record<string, unknown>);
-  void round1; // available if needed
 
   const myRoleColor =
     ROLE_COLORS[gameData.myRole as TeamMemberRole] ?? "#00f5ff";
@@ -97,7 +88,7 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
   }, [gameData.status, refreshGame]);
 
   // Extract world event from first round if available
-  const worldEvent = (gameData.settings as Record<string, unknown>).worldEvent as WorldEvent | undefined;
+  const worldEvent = (gameData.settings as Record<string, unknown>).worldEvent as { title: string; description: string } | undefined;
 
   return (
     <div

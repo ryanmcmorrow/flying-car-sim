@@ -7,6 +7,9 @@ import { RoleSlots } from "@/components/game/RoleSlots";
 import type { TeamMemberRole } from "@/app/generated/prisma/client";
 import { ROLE_COLORS } from "@/lib/game-utils";
 
+const pxFont = "var(--font-pixel), monospace";
+const bodyFont = "var(--font-pixel-body), monospace";
+
 interface TeamMember {
   id: string;
   role: string;
@@ -41,17 +44,6 @@ interface GameData {
   rounds: Round[];
 }
 
-interface StartResult {
-  worldEvent: { id: string; title: string; description: string; effect: string };
-  briefing: {
-    totalFlyingCarDemand: number;
-    demandByType: Record<string, number>;
-    publicPerception: number;
-    policyScore: number;
-    economicCondition: string;
-  };
-}
-
 interface Props {
   game: GameData;
 }
@@ -61,7 +53,7 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
   const [game, setGame] = useState<GameData>(initialGame);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState("");
-  const [startResult, setStartResult] = useState<StartResult | null>(null);
+  const [startResult, setStartResult] = useState<{ worldEvent: { title: string; description: string }; briefing: { totalFlyingCarDemand: number; economicCondition: string; publicPerception: number; policyScore: number } } | null>(null);
   const [copied, setCopied] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
@@ -142,9 +134,6 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
-
-  const pxFont = "var(--font-pixel), monospace";
-  const bodyFont = "var(--font-pixel-body), monospace";
 
   return (
     <div

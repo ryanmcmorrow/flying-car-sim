@@ -192,18 +192,11 @@ export interface InstalledBaseUpdate {
   unitsToAdd: number;
 }
 
-export interface UpdatedTeamSpace {
-  teamId: string;
-  size: string;
-  ownership: string;
-}
-
 export interface ResolveRoundOutput {
   teamResults: Record<string, TeamRoundResult>;
   industrySnapshot: IndustrySnapshot;
   newRdUnlocks: NewRdUnlock[];
   installedBaseUpdates: InstalledBaseUpdate[];
-  updatedTeamSpaces: Record<string, { size: string; ownership: string } | null>;
   nextRoundSettings: {
     policyScore: number;
     publicPerception: number;
