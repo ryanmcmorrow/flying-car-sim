@@ -127,6 +127,7 @@ export default async function PlayPage({ params }: PageProps) {
         roundNumber: round.roundNumber,
         status: round.status,
         worldEvent: round.worldEvent as { title: string; description: string } | null,
+        expiresAt: round.expiresAt?.toISOString() ?? null,
       }}
       team={{
         id: team.id,

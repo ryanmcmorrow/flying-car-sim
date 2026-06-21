@@ -27,6 +27,7 @@ export async function GET(
       rounds: {
         include: { decisions: { select: { submittedAt: true } } },
         orderBy: { roundNumber: "asc" },
+        // expiresAt is a scalar — returned automatically
       },
     },
   });
@@ -52,6 +53,8 @@ export async function GET(
     code: game.code,
     status: game.status,
     currentRound: game.currentRound,
+    mode: game.mode,
+    roundDurationSeconds: game.roundDurationSeconds,
     settings: game.settings,
     createdAt: game.createdAt.toISOString(),
     teams: game.teams.map((t) => ({
@@ -74,6 +77,7 @@ export async function GET(
       worldEvent: r.worldEvent,
       openedAt: r.openedAt?.toISOString() ?? null,
       resolvedAt: r.resolvedAt?.toISOString() ?? null,
+      expiresAt: r.expiresAt?.toISOString() ?? null,
       submittedCount: r.decisions.filter((d) => d.submittedAt !== null).length,
     })),
   });

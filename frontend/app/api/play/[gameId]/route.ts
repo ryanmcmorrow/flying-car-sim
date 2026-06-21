@@ -125,6 +125,7 @@ export async function GET(
       roundNumber: round.roundNumber,
       status: round.status,
       worldEvent: round.worldEvent,
+      expiresAt: round.expiresAt?.toISOString() ?? null,
     },
     team: {
       id: team.id,

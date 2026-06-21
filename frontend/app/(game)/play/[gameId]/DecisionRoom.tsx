@@ -33,6 +33,7 @@ interface DecisionRoomProps {
     roundNumber: number;
     status: string;
     worldEvent: { title: string; description: string } | null;
+    expiresAt: string | null;
   };
   team: { id: string; brandName: string; cash: string };
   myRole: TeamMemberRole;
@@ -135,6 +136,21 @@ export function DecisionRoom({
     }, 3000);
     return () => clearInterval(interval);
   }, [submittedAt, gameId, router]);
+  // Countdown timer for PARTY mode
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(() => {
+    if (!round.expiresAt) return null;
+    return Math.max(0, Math.floor((new Date(round.expiresAt).getTime() - Date.now()) / 1000));
+  });
+  useEffect(() => {
+    if (secondsLeft === null) return;
+    if (secondsLeft <= 0) return;
+    const t = setInterval(() => {
+      const s = Math.max(0, Math.floor((new Date(round.expiresAt!).getTime() - Date.now()) / 1000));
+      setSecondsLeft(s);
+    }, 1000);
+    return () => clearInterval(t);
+  }, [round.expiresAt, secondsLeft]);
+
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
 
@@ -307,23 +323,22 @@ export function DecisionRoom({
                 {myRole} — {team.brandName}
               </p>
             </div>
+            {secondsLeft !== null && (
+              <div className="text-center px-4">
+                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.42rem", color: "var(--px-gray)" }}>TIME LEFT</p>
+                <p style={{
+                  fontFamily: "var(--font-pixel)",
+                  fontSize: "1.1rem",
+                  color: secondsLeft <= 60 ? "var(--px-pink)" : secondsLeft <= 120 ? "var(--px-amber)" : "var(--px-cyan)",
+                  animation: secondsLeft <= 30 ? "pixel-blink 0.5s step-end infinite" : undefined,
+                }}>
+                  {secondsLeft <= 0 ? "TIME'S UP" : `${String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:${String(secondsLeft % 60).padStart(2, "0")}`}
+                </p>
+              </div>
+            )}
             <div className="text-right">
-              <p
-                style={{
-                  fontFamily: "var(--font-pixel)",
-                  fontSize: "0.5rem",
-                  color: "var(--px-gray)",
-                }}
-              >
-                CASH BALANCE
-              </p>
-              <p
-                style={{
-                  fontFamily: "var(--font-pixel)",
-                  fontSize: "0.75rem",
-                  color: "var(--px-green)",
-                }}
-              >
+              <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "var(--px-gray)" }}>CASH BALANCE</p>
+              <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.75rem", color: "var(--px-green)" }}>
                 ${parseFloat(team.cash).toLocaleString()}
               </p>
             </div>

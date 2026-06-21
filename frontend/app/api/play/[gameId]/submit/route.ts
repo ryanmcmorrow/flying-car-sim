@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { resolveGameById } from "@/lib/resolve-game";
 import type { VehicleSection, ManufacturingSection, ProductionSection } from "@/types/decisions";
 
 // POST /api/play/[gameId]/submit — CEO submits the round
@@ -112,6 +113,19 @@ export async function POST(
     where: { id: decision.id },
     data: { submittedAt: new Date() },
   });
+
+  // PARTY mode: auto-resolve when all teams have submitted
+  if (game.mode === "PARTY") {
+    const allDecisions = await db.decision.findMany({
+      where: { roundId: round.id },
+      select: { submittedAt: true },
+    });
+    const allSubmitted = allDecisions.length > 0 && allDecisions.every((d) => d.submittedAt !== null);
+    if (allSubmitted) {
+      // Fire-and-forget: if it fails the cron will catch it
+      resolveGameById(gameId).catch((err) => console.error("[submit] auto-resolve failed:", err));
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -46,19 +46,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let body: { economicCondition?: string };
+  let body: { economicCondition?: string; mode?: string; roundDurationSeconds?: number };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { economicCondition } = body;
+  const { economicCondition, mode = "CLASSROOM", roundDurationSeconds } = body;
   if (!["stable", "growth", "recession"].includes(economicCondition ?? "")) {
     return NextResponse.json(
       { error: "economicCondition must be stable | growth | recession" },
       { status: 400 }
     );
+  }
+  if (!["CLASSROOM", "PARTY"].includes(mode)) {
+    return NextResponse.json({ error: "mode must be CLASSROOM | PARTY" }, { status: 400 });
+  }
+  if (mode === "PARTY" && (!roundDurationSeconds || roundDurationSeconds < 60)) {
+    return NextResponse.json({ error: "PARTY mode requires roundDurationSeconds >= 60" }, { status: 400 });
   }
 
   // Generate unique game code (retry on collision)
@@ -82,6 +88,8 @@ export async function POST(req: NextRequest) {
     data: {
       code,
       facilitatorId: session.user.id,
+      mode: mode as "CLASSROOM" | "PARTY",
+      roundDurationSeconds: mode === "PARTY" ? roundDurationSeconds : null,
       settings: {
         economicCondition,
         createdAt: new Date().toISOString(),
@@ -89,5 +97,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ id: game.id, code: game.code }, { status: 201 });
+  return NextResponse.json({ id: game.id, code: game.code, mode: game.mode }, { status: 201 });
 }

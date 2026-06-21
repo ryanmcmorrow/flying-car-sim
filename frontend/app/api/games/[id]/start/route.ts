@@ -64,6 +64,12 @@ export async function POST(
     JSON.stringify({ ...settings, year1Briefing: briefing })
   ) as Prisma.InputJsonValue;
 
+  const now = new Date();
+  const expiresAt =
+    game.mode === "PARTY" && game.roundDurationSeconds
+      ? new Date(now.getTime() + game.roundDurationSeconds * 1000)
+      : null;
+
   // Create round 1 and update game atomically
   const [round] = await db.$transaction([
     db.round.create({
@@ -72,7 +78,8 @@ export async function POST(
         roundNumber: 1,
         status: "OPEN",
         worldEvent: worldEventJson,
-        openedAt: new Date(),
+        openedAt: now,
+        ...(expiresAt ? { expiresAt } : {}),
       },
     }),
     db.game.update({
