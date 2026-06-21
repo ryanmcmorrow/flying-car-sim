@@ -3,8 +3,6 @@ import { db } from "@/lib/db";
 import { TeamMemberRole } from "@/app/generated/prisma/client";
 import { ALL_ROLES } from "@/lib/game-utils";
 import bcrypt from "bcryptjs";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const Filter = require("bad-words");
 
 /**
  * POST /api/games/join
@@ -54,13 +52,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 
-  // ── Profanity filter ──
+  // ── Basic profanity check ──
+  const { Filter } = await import("bad-words");
   const filter = new Filter();
   if (filter.isProfane(playerName.trim()) || filter.isProfane(brandName.trim())) {
-    return NextResponse.json(
-      { error: "INAPPROPRIATE CONTENT DETECTED" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "INAPPROPRIATE CONTENT DETECTED" }, { status: 400 });
   }
 
   const chosenRole = role as TeamMemberRole;
