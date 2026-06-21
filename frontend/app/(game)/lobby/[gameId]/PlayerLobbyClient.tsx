@@ -465,6 +465,14 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
             >
               TRANSMISSION END — GOOD LUCK PILOT
             </p>
+
+            <a
+              href={`/play/${gameData.id}`}
+              className="pixel-btn pixel-btn-green"
+              style={{ display: "block", textAlign: "center", marginTop: "1.5rem", fontSize: "0.55rem" }}
+            >
+              ▶ ENTER DECISION ROOM
+            </a>
           </div>
         )}
 
@@ -479,9 +487,13 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
             >
               GAME ACTIVE — ROUND {gameData.currentRound}
             </p>
-            <p style={{ fontSize: "1.1rem", color: "#888899", marginTop: "0.75rem" }}>
-              Await your facilitator's instructions.
-            </p>
+            <a
+              href={`/play/${gameData.id}`}
+              className="pixel-btn pixel-btn-green"
+              style={{ display: "inline-block", marginTop: "1.25rem", fontSize: "0.55rem" }}
+            >
+              ▶ ENTER DECISION ROOM
+            </a>
           </div>
         )}
       </div>
