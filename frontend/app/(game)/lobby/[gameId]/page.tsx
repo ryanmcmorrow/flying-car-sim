@@ -48,11 +48,15 @@ export default async function PlayerLobbyPage({ params }: Props) {
     redirect("/login");
   }
 
+  const isHost = game.facilitatorId === session.user.id;
+
   const gameData = {
     id: game.id,
     code: game.code,
     status: game.status as "LOBBY" | "ACTIVE" | "COMPLETED",
     currentRound: game.currentRound,
+    mode: game.mode as string,
+    isHost,
     settings: game.settings as Record<string, unknown>,
     myTeam: {
       id: myTeam.id,

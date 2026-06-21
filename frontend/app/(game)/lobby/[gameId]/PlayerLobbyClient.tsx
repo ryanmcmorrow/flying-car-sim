@@ -17,6 +17,8 @@ interface GameData {
   code: string;
   status: "LOBBY" | "ACTIVE" | "COMPLETED";
   currentRound: number;
+  mode: string;
+  isHost: boolean;
   settings: Record<string, unknown>;
   myTeam: {
     id: string;
@@ -86,6 +88,24 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
     const interval = setInterval(refreshGame, 3000);
     return () => clearInterval(interval);
   }, [gameData.status, refreshGame]);
+
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState("");
+
+  async function handleStart() {
+    setStartError("");
+    setStarting(true);
+    try {
+      const res = await fetch(`/api/games/${gameData.id}/start`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) { setStartError(body.error ?? "START FAILED"); return; }
+      await refreshGame();
+    } catch {
+      setStartError("CONNECTION ERROR");
+    } finally {
+      setStarting(false);
+    }
+  }
 
   // Extract world event from first round if available
   const worldEvent = (gameData.settings as Record<string, unknown>).worldEvent as { title: string; description: string } | undefined;
@@ -227,29 +247,31 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
         </div>
 
         {/* Status section */}
-        {gameData.status === "LOBBY" && (
+        {gameData.status === "LOBBY" && gameData.isHost && (
+          <div className="pixel-card text-center py-6" style={{ borderColor: "#ff006e", boxShadow: "4px 4px 0 #7d0030" }}>
+            <p className="pixel-heading mb-3" style={{ fontSize: "0.55rem", color: "#ff006e" }}>🎉 PARTY HOST CONTROLS</p>
+            <p style={{ fontSize: "1rem", color: "#888899", marginBottom: "1.5rem" }}>
+              Everyone in? Hit launch to start the 8-minute round timer.
+            </p>
+            {startError && (
+              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.45rem", color: "#ff006e", marginBottom: "1rem" }}>❌ {startError}</p>
+            )}
+            <button onClick={handleStart} disabled={starting} className="pixel-btn pixel-btn-pink" style={{ fontSize: "0.55rem" }}>
+              {starting ? "LAUNCHING..." : "⚡ LAUNCH GAME"}
+            </button>
+          </div>
+        )}
+
+        {gameData.status === "LOBBY" && !gameData.isHost && (
           <div
             className="pixel-card text-center py-6"
             style={{ borderColor: "#ffbe0b", boxShadow: "4px 4px 0 #7d5d00" }}
           >
-            <p
-              className="pixel-heading mb-4"
-              style={{ fontSize: "0.55rem", color: "#ffbe0b" }}
-            >
-              WAITING FOR FACILITATOR
-            </p>
+            <p className="pixel-heading mb-4" style={{ fontSize: "0.55rem", color: "#ffbe0b" }}>WAITING FOR HOST</p>
             <p style={{ fontSize: "1.1rem", color: "#888899", marginBottom: "1.5rem" }}>
-              The game will start when the facilitator launches it.
-              Hang tight, pilot.
+              The host will launch the game when everyone is ready. Hang tight, pilot.
             </p>
-            <span
-              className="blink"
-              style={{
-                fontFamily: "var(--font-pixel), monospace",
-                fontSize: "0.45rem",
-                color: "#4a4a6a",
-              }}
-            >
+            <span className="blink" style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.45rem", color: "#4a4a6a" }}>
               ■ POLLING FOR GAME START...
             </span>
           </div>
