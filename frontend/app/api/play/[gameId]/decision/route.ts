@@ -83,10 +83,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Game not found" }, { status: 404 });
   }
 
-  const round =
-    game.rounds.find((r) => r.status === "OPEN") ??
-    game.rounds.find((r) => r.roundNumber === game.currentRound) ??
-    null;
+  if (game.status !== "ACTIVE") {
+    return NextResponse.json({ error: "Game is not active" }, { status: 400 });
+  }
+
+  const round = game.rounds.find((r) => r.status === "OPEN") ?? null;
 
   if (!round) {
     return NextResponse.json({ error: "No active round" }, { status: 400 });

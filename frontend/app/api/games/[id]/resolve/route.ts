@@ -80,7 +80,7 @@ export async function POST(
   // ── Find current round ───────────────────────────────────────────────────────
   const currentRound = game.rounds.find(
     (r: { status: string; roundNumber: number }) =>
-      r.status === "OPEN" || r.roundNumber === game.currentRound
+      r.roundNumber === game.currentRound
   );
 
   if (!currentRound) {
@@ -354,16 +354,20 @@ export async function POST(
     );
   }
 
-  // 4. RdUnlock records
+  // 4. RdUnlock records — upsert so retries are safe
   for (const unlock of output.newRdUnlocks) {
     transactionOps.push(
-      db.rdUnlock.create({
-        data: {
+      db.rdUnlock.upsert({
+        where: {
+          teamId_unlockKey: { teamId: unlock.teamId, unlockKey: unlock.unlockKey },
+        },
+        create: {
           teamId: unlock.teamId,
           unlockKey: unlock.unlockKey,
           unlockedInRound: unlock.unlockedInRound,
           exclusiveUntilRound: unlock.exclusiveUntilRound ?? undefined,
         },
+        update: {},
       })
     );
   }
@@ -385,55 +389,22 @@ export async function POST(
   ) as Prisma.InputJsonValue;
 
   if (!isLastRound) {
-    // 7. Create next round
     transactionOps.push(
       db.game.update({
         where: { id: game.id },
-        data: {
-          currentRound: roundNumber + 1,
-          settings: newSettings,
-        },
+        data: { currentRound: roundNumber + 1, settings: newSettings },
       })
     );
-    transactionOps.push(
-      db.round.create({
-        data: {
-          gameId: game.id,
-          roundNumber: roundNumber + 1,
-          status: "OPEN",
-          worldEvent: nextWorldEvent as Prisma.InputJsonValue,
-          openedAt: now,
-        },
-      })
-    );
-
-    // Create Decision records for each team in the new round
-    for (const team of game.teams) {
-      transactionOps.push(
-        db.decision.create({
-          data: {
-            round: {
-              connect: { gameId_roundNumber: { gameId: game.id, roundNumber: roundNumber + 1 } },
-            },
-            team: { connect: { id: team.id } },
-          },
-        })
-      );
-    }
   } else {
-    // Final round
     transactionOps.push(
       db.game.update({
         where: { id: game.id },
-        data: {
-          status: "COMPLETED",
-          settings: newSettings,
-        },
+        data: { status: "COMPLETED", settings: newSettings },
       })
     );
   }
 
-  // Execute transaction
+  // Execute transaction (Results, cash, installed bases, unlocks, round status, game update)
   try {
     await db.$transaction(transactionOps);
   } catch (err) {
@@ -442,6 +413,32 @@ export async function POST(
       { error: "Failed to persist round results" },
       { status: 500 }
     );
+  }
+
+  // Create the next round + Decision stubs after the main transaction so the
+  // Round row exists before Decisions try to reference it.
+  if (!isLastRound) {
+    try {
+      const nextRound = await db.round.create({
+        data: {
+          gameId: game.id,
+          roundNumber: roundNumber + 1,
+          status: "OPEN",
+          worldEvent: nextWorldEvent as Prisma.InputJsonValue,
+          openedAt: now,
+        },
+      });
+      await db.decision.createMany({
+        data: game.teams.map((team: { id: string }) => ({
+          roundId: nextRound.id,
+          teamId: team.id,
+        })),
+        skipDuplicates: true,
+      });
+    } catch (err) {
+      console.error("[resolve] next-round creation failed:", err);
+      // Non-fatal: the round results are committed; next round creation can be retried
+    }
   }
 
   return NextResponse.json({

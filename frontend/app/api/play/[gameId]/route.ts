@@ -102,13 +102,23 @@ export async function GET(
         )
       : null;
 
+  // Only expose public settings fields — internal demand curves and competitor
+  // brand perceptions are facilitator-only data.
+  const rawSettings = (game.settings ?? {}) as Record<string, unknown>;
+  const publicSettings = {
+    economicCondition: rawSettings.economicCondition,
+    policyScore: rawSettings.policyScore,
+    publicPerception: rawSettings.publicPerception,
+    totalFlyingCarDemand: rawSettings.totalFlyingCarDemand,
+  };
+
   return NextResponse.json({
     game: {
       id: game.id,
       code: game.code,
       currentRound: game.currentRound,
       status: game.status,
-      settings: game.settings,
+      settings: publicSettings,
     },
     round: {
       id: round.id,

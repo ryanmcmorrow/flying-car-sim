@@ -15,6 +15,7 @@ import {
   INVENTORY_CARRYING_COST,
   RD_RECURRING_COSTS,
   TECH_TREE_COSTS,
+  AVG_REPAIR_VALUE,
 } from "./constants";
 import { getPolicyDemandFactor, computeThisRoundDemand, computeNextRoundDemand } from "./demand";
 import { computeSupplyChainScarcity, computeSegmentCrowding, computeRegionalGlutDiscounts, computeTalentWarPenalty } from "./scarcity";
@@ -103,6 +104,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
   // ── Step 6: Per-team unit economics ──────────────────────────────────────
   interface TeamCalcs {
     rdSpend: number;
+    effectiveRdSpend: number;
     unlocksPurchased: string[];
     allRdUnlocks: string[]; // existing + this round's
     effectiveUnitCostByModelId: Record<string, number>;
@@ -115,7 +117,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
   const teamCalcs: Record<string, TeamCalcs> = {};
 
   for (const team of teams) {
-    const { totalRdSpend, unlocksPurchased } = computeTeamRdSpend(team, talentWarPenalty);
+    const { totalRdSpend, effectiveRdSpend, unlocksPurchased } = computeTeamRdSpend(team, talentWarPenalty);
     const allRdUnlocks = [...team.existingRdUnlocks, ...unlocksPurchased];
 
     const effectiveUnitCostByModelId: Record<string, number> = {};
@@ -139,6 +141,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
 
     teamCalcs[team.teamId] = {
       rdSpend: totalRdSpend,
+      effectiveRdSpend,
       unlocksPurchased,
       allRdUnlocks,
       effectiveUnitCostByModelId,
@@ -415,6 +418,29 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       COMPACT: 0, SEDAN: 0, SUV: 0, TRUCK: 0, SPORTS_CAR: 0,
     };
 
+    // Distribute prior inventory across models of the same type proportionally by production volume
+    const priorInventoryByModelId: Record<string, number> = {};
+    const modelsGroupedByType: Record<string, Array<{ id: string; units: number }>> = {};
+    for (const model of team.vehicleSection.models) {
+      const r = team.manufacturingSection.productionRuns.find((pr) => pr.modelId === model.id);
+      if (!modelsGroupedByType[model.vehicleType]) modelsGroupedByType[model.vehicleType] = [];
+      modelsGroupedByType[model.vehicleType].push({ id: model.id, units: r?.units ?? 0 });
+    }
+    for (const vt of VEHICLE_TYPES) {
+      const group = modelsGroupedByType[vt];
+      if (!group?.length) continue;
+      const totalInv = team.priorInventory[vt] ?? 0;
+      if (!totalInv) continue;
+      const totalProd = group.reduce((s, m) => s + m.units, 0);
+      for (const m of group) {
+        const share = totalProd > 0 ? m.units / totalProd : 1 / group.length;
+        priorInventoryByModelId[m.id] = Math.round(totalInv * share);
+      }
+    }
+    const inventorySoldThisRound: Record<VehicleType, number> = {
+      COMPACT: 0, SEDAN: 0, SUV: 0, TRUCK: 0, SPORTS_CAR: 0,
+    };
+
     for (const model of team.vehicleSection.models) {
       const run = team.manufacturingSection.productionRuns.find(
         (r) => r.modelId === model.id
@@ -438,23 +464,35 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       let modelUnitsSold = 0;
       let modelRevenue = 0;
       let modelUnitsDemanded = 0;
+      let modelInvUnitsSold = 0;
+
+      const modelPriorInv = priorInventoryByModelId[model.id] ?? 0;
+      const inventoryDiscount = prodModel.inventoryDiscount ?? 0;
 
       for (const region of REGIONS) {
         const regionAlloc =
           prodModel.regionalAllocation[region as keyof typeof prodModel.regionalAllocation] ?? 0;
         if (regionAlloc <= 0) continue;
 
-        const allocatedUnits = Math.round(unitsProduced * (regionAlloc / 100));
+        const allocatedNew = Math.round(unitsProduced * (regionAlloc / 100));
+        const allocatedInv = Math.round(modelPriorInv * (regionAlloc / 100));
+        const totalAllocated = allocatedNew + allocatedInv;
         const demanded =
           unitsDemandedByModelByRegion[team.teamId]?.[model.id]?.[region] ?? 0;
-        const soldHere = Math.min(demanded, allocatedUnits);
+        const soldHere = Math.min(demanded, totalAllocated);
         const effectivePrice =
           effectivePriceByModelByRegion[team.teamId]?.[model.id]?.[region] ?? salePrice;
         const glutDiscount = glutDiscounts[model.vehicleType]?.[region] ?? 0;
 
+        // New production fills first; inventory covers the remainder
+        const newSoldHere = Math.min(soldHere, allocatedNew);
+        const invSoldHere = soldHere - newSoldHere;
+        const effectiveInvPrice = Math.round(effectivePrice * (1 - inventoryDiscount / 100));
+        const revenueHere = newSoldHere * effectivePrice + invSoldHere * effectiveInvPrice;
+
         byRegion.push({
           region,
-          allocated: allocatedUnits,
+          allocated: totalAllocated,
           demanded,
           sold: soldHere,
           effectivePrice,
@@ -462,11 +500,14 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
         });
 
         modelUnitsSold += soldHere;
-        modelRevenue += soldHere * effectivePrice;
+        modelRevenue += revenueHere;
         modelUnitsDemanded += demanded;
+        modelInvUnitsSold += invSoldHere;
       }
 
-      const unitsLeftInInventory = Math.max(0, unitsProduced - modelUnitsSold);
+      inventorySoldThisRound[model.vehicleType] += modelInvUnitsSold;
+      const newProdSold = modelUnitsSold - modelInvUnitsSold;
+      const unitsLeftInInventory = Math.max(0, unitsProduced - newProdSold);
       inventoryByType[model.vehicleType] += unitsLeftInInventory;
 
       const modelCogs = unitsProduced * unitCost;
@@ -514,14 +555,18 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       if (baseUnits === 0) continue;
       const modelResult = modelResults.find((m) => m.vehicleType === vt);
       const repairRate = modelResult?.fleetRepairRate ?? 0;
-      repairByType[vt] = baseUnits * repairRate * 2400;
+      repairByType[vt] = baseUnits * repairRate * AVG_REPAIR_VALUE;
     }
     for (const mr of modelResults) {
       mr.repairRevenue = Math.round(repairByType[mr.vehicleType] ?? 0);
     }
 
-    // Inventory carrying cost from PRIOR round's inventory
-    const carryingCost = computeInventoryCarryingCost(team.priorInventory);
+    // Carrying cost applies only to unsold prior inventory (deduct what was sold this round)
+    const adjustedPriorInventory = { ...team.priorInventory };
+    for (const vt of VEHICLE_TYPES) {
+      adjustedPriorInventory[vt] = Math.max(0, (team.priorInventory[vt] ?? 0) - (inventorySoldThisRound[vt] ?? 0));
+    }
+    const carryingCost = computeInventoryCarryingCost(adjustedPriorInventory);
 
     const spaceCostResult = calcs.spaceCostResult;
     const rdSpend = calcs.rdSpend;
@@ -576,7 +621,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       isAttackAd: mktCalcs?.isAttack ?? false,
       attackBackfireChance: 0.20,
       modelResults,
-      effectiveRdSpend: rdSpend,
+      effectiveRdSpend: calcs.effectiveRdSpend,
       publicPerception,
       worldEventPerceptionModifier: worldEventPerceptionMod,
       incomingAttackSpend,
@@ -709,10 +754,17 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     return calcs?.allRdUnlocks ?? t.existingRdUnlocks;
   });
 
+  // Use this round's realized demand (not stale prior) as the growth base
+  const currentFlyingDemand = VEHICLE_TYPES.reduce(
+    (sum, vt) => sum + REGIONS.reduce((s, r) => s + (demandByTypeByRegion[vt]?.[r] ?? 0), 0),
+    0
+  );
+  const currentTraditionalDemand = Math.max(0, priorTraditionalDemand + priorFlyingDemand - currentFlyingDemand);
+
   const nextDemand = computeNextRoundDemand(
     {
-      currentFlyingDemand: priorFlyingDemand,
-      currentTraditionalDemand: priorTraditionalDemand,
+      currentFlyingDemand,
+      currentTraditionalDemand,
       policyScore: newPolicyScore,
       categoryMarketingSpend: totalCategoryMarketingSpend,
       allTeamRdUnlocks,
@@ -880,7 +932,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     fly_by_wire: "Fly-By-Wire",
     battery_research: "Battery Research",
     market_analytics: "Market Analytics",
-    competitive_intel: "Competitive Intelligence",
+    competitive_intel: "Competitive Intel",
     fuel_cell_research: "Fuel Cell Research",
     autonomous_flight: "Autonomous Flight",
     fuel_efficiency: "Fuel Efficiency",

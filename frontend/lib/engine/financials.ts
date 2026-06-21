@@ -23,7 +23,7 @@ import { computeModelUnitCost } from "@/lib/decision-utils";
 export function computeTeamRdSpend(
   team: TeamInput,
   talentWarPenalty: number
-): { totalRdSpend: number; unlocksPurchased: string[] } {
+): { totalRdSpend: number; effectiveRdSpend: number; unlocksPurchased: string[] } {
   const rd = team.rdSection;
   let spend = 0;
 
@@ -43,8 +43,10 @@ export function computeTeamRdSpend(
     }
   }
 
-  const totalRdSpend = spend * (1 - talentWarPenalty);
-  return { totalRdSpend, unlocksPurchased };
+  // Charge full spend to cash; talent war only reduces benefit, not cost
+  const totalRdSpend = spend;
+  const effectiveRdSpend = spend * (1 - talentWarPenalty);
+  return { totalRdSpend, effectiveRdSpend, unlocksPurchased };
 }
 
 // ── Manufacturing efficiency from R&D ────────────────────────────────────────

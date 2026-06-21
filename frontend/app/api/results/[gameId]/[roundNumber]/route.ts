@@ -61,15 +61,30 @@ export async function GET(
       include: { team: true },
     });
 
+    // Strip private financial data from each team's result — only expose
+    // what would appear in the public leaderboard per the GDD.
+    const sanitizedResults = allResults.map((r: { teamId: string; team: { brandName: string }; teamResult: unknown }) => {
+      const tr = (r.teamResult ?? {}) as Record<string, unknown>;
+      return {
+        teamId: r.teamId,
+        brandName: r.team.brandName,
+        revenue: (tr.revenue as Record<string, number>)?.total ?? 0,
+        unitsSold: tr.unitsSoldTotal ?? 0,
+        netCashChange: tr.netCashChange ?? 0,
+        newCash: tr.newCash ?? "0",
+        brandPerceptionEnd: tr.brandPerceptionEnd ?? 0,
+        marketShareByType: tr.marketShareByType ?? {},
+        recallsThisRound: (tr.modelResults as Array<Record<string, unknown>>)
+          ?.filter((m) => m.recallTier !== "none")
+          .map((m) => ({ vehicleType: m.vehicleType, tier: m.recallTier })) ?? [],
+      };
+    });
+
     return NextResponse.json({
       role: "FACILITATOR",
       roundNumber,
       industrySnapshot: anyResult.industrySnapshot,
-      allTeamResults: allResults.map((r: { teamId: string; team: { brandName: string }; teamResult: unknown }) => ({
-        teamId: r.teamId,
-        brandName: r.team.brandName,
-        teamResult: r.teamResult,
-      })),
+      allTeamResults: sanitizedResults,
     });
   }
 
