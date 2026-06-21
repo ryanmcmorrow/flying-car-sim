@@ -63,8 +63,8 @@ export async function POST(req: NextRequest) {
   if (!["CLASSROOM", "PARTY"].includes(mode)) {
     return NextResponse.json({ error: "mode must be CLASSROOM | PARTY" }, { status: 400 });
   }
-  if (mode === "PARTY" && (!roundDurationSeconds || roundDurationSeconds < 60)) {
-    return NextResponse.json({ error: "PARTY mode requires roundDurationSeconds >= 60" }, { status: 400 });
+  if (roundDurationSeconds !== undefined && roundDurationSeconds < 60) {
+    return NextResponse.json({ error: "roundDurationSeconds must be >= 60" }, { status: 400 });
   }
 
   // Generate unique game code (retry on collision)

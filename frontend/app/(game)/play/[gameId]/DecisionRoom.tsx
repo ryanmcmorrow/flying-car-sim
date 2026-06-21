@@ -53,12 +53,12 @@ interface DecisionRoomProps {
 }
 
 
-const ALL_TABS: { role: TeamMemberRole; label: string }[] = [
-  { role: "CEO", label: "CEO" },
-  { role: "CFO", label: "CFO" },
-  { role: "CMO", label: "CMO" },
-  { role: "CTO", label: "CTO" },
-  { role: "COO", label: "COO" },
+const ALL_TABS: { role: TeamMemberRole; label: string; icon: string }[] = [
+  { role: "CEO", label: "CEO", icon: "🏛️" },
+  { role: "CFO", label: "CFO", icon: "💰" },
+  { role: "CMO", label: "CMO", icon: "📣" },
+  { role: "CTO", label: "CTO", icon: "🔬" },
+  { role: "COO", label: "COO", icon: "🏭" },
 ];
 
 // Role → sections that player can edit
@@ -119,9 +119,10 @@ export function DecisionRoom({
   const [activeTab, setActiveTab] = useState<TeamMemberRole>(myRole);
   const router = useRouter();
 
-  // After submitting, poll until round resolves then redirect to results
+  // Poll until round resolves then redirect to results.
+  // Always active in Party Mode (timer can resolve without submit); otherwise only after submit.
   useEffect(() => {
-    if (!submittedAt) return;
+    if (!submittedAt && game.mode !== "PARTY") return;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/play/${gameId}`);
@@ -135,7 +136,7 @@ export function DecisionRoom({
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [submittedAt, gameId, router]);
+  }, [submittedAt, gameId, game.mode, router]);
   // Countdown timer for PARTY mode
   const [secondsLeft, setSecondsLeft] = useState<number | null>(() => {
     if (!round.expiresAt) return null;
@@ -399,7 +400,7 @@ export function DecisionRoom({
         {/* Role Tabs */}
         <div>
           <div className="flex gap-1 flex-wrap">
-            {ALL_TABS.map(({ role, label }) => {
+            {ALL_TABS.map(({ role, label, icon }) => {
               const color = ROLE_COLORS[role];
               const isActive = activeTab === role;
               const isMyRole = role === myRole;
@@ -419,7 +420,7 @@ export function DecisionRoom({
                     position: "relative",
                   }}
                 >
-                  {label}
+                  <span style={{ marginRight: "0.3rem" }}>{icon}</span>{label}
                   {isMyRole && (
                     <span
                       style={{

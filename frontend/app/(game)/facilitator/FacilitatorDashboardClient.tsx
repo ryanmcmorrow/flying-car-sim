@@ -41,6 +41,7 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
   // Step 1: config
   const [economicCondition, setEconomicCondition] = useState<"stable" | "growth" | "recession">("stable");
   const [mode, setMode] = useState<"CLASSROOM" | "PARTY">("CLASSROOM");
+  const [timerEnabled, setTimerEnabled] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
@@ -63,7 +64,7 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
       const res = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ economicCondition, mode, roundDurationSeconds: mode === "PARTY" ? 480 : undefined }),
+        body: JSON.stringify({ economicCondition, mode, roundDurationSeconds: mode === "PARTY" && timerEnabled ? 480 : undefined }),
       });
       const body = await res.json();
       if (!res.ok) { setCreateError(body.error ?? "CREATE FAILED"); return; }
@@ -192,6 +193,21 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
                     ))}
                   </div>
                 </div>
+
+                {/* Timer toggle — Party only */}
+                {mode === "PARTY" && (
+                  <div className="mb-5">
+                    <button type="button" onClick={() => setTimerEnabled((v) => !v)} className="w-full text-left p-3"
+                      style={{ border: "2px solid", borderColor: timerEnabled ? "#ffbe0b" : "#4a4a6a", background: timerEnabled ? "#ffbe0b22" : "#0a0a1a", cursor: "pointer" }}>
+                      <div style={{ fontFamily: px, fontSize: "0.45rem", color: timerEnabled ? "#ffbe0b" : "#888899", marginBottom: "0.3rem" }}>
+                        ⏱ {timerEnabled ? "TIMER: ON (8 min/round)" : "TIMER: OFF (no time limit)"}
+                      </div>
+                      <div style={{ fontFamily: body, fontSize: "0.9rem", color: timerEnabled ? "#cccccc" : "#666677" }}>
+                        {timerEnabled ? "Rounds auto-resolve after 8 minutes." : "Rounds only resolve when you press the button. Good for playtesting."}
+                      </div>
+                    </button>
+                  </div>
+                )}
 
                 {/* Econ condition */}
                 <div className="space-y-2 mb-6">

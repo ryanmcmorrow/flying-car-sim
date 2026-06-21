@@ -95,24 +95,12 @@ export async function resolveGameById(gameId: string): Promise<ResolveResult> {
   for (const team of game.teams) {
     const decision = team.decisions.find((d) => d.roundId === currentRound.id);
 
-    const vehicleSection = decision?.vehicleSection
-      ? (decision.vehicleSection as unknown as VehicleSection)
-      : getEmptyVehicleSection();
-    const rdSection = decision?.rdSection
-      ? (decision.rdSection as unknown as RdSection)
-      : getEmptyRdSection();
-    const manufacturingSection = decision?.manufacturingSection
-      ? (decision.manufacturingSection as unknown as ManufacturingSection)
-      : getEmptyManufacturingSection();
-    const productionSection = decision?.productionSection
-      ? (decision.productionSection as unknown as ProductionSection)
-      : getEmptyProductionSection();
-    const marketingSection = decision?.marketingSection
-      ? (decision.marketingSection as unknown as MarketingSection)
-      : getEmptyMarketingSection();
-    const lobbyingSection = decision?.lobbyingSection
-      ? (decision.lobbyingSection as unknown as LobbyingSection)
-      : getEmptyLobbyingSection();
+    const vehicleSection: VehicleSection = { ...getEmptyVehicleSection(), ...(decision?.vehicleSection as unknown as VehicleSection ?? {}) };
+    const rdSection: RdSection = { ...getEmptyRdSection(), ...(decision?.rdSection as unknown as RdSection ?? {}) };
+    const manufacturingSection: ManufacturingSection = { ...getEmptyManufacturingSection(), ...(decision?.manufacturingSection as unknown as ManufacturingSection ?? {}) };
+    const productionSection: ProductionSection = { ...getEmptyProductionSection(), ...(decision?.productionSection as unknown as ProductionSection ?? {}) };
+    const marketingSection: MarketingSection = { ...getEmptyMarketingSection(), ...(decision?.marketingSection as unknown as MarketingSection ?? {}) };
+    const lobbyingSection: LobbyingSection = { ...getEmptyLobbyingSection(), ...(decision?.lobbyingSection as unknown as LobbyingSection ?? {}) };
 
     const existingRdUnlocks = team.rdUnlocks.map((u) => u.unlockKey);
 
@@ -272,7 +260,16 @@ export async function resolveGameById(gameId: string): Promise<ResolveResult> {
       },
     });
     await db.decision.createMany({
-      data: game.teams.map((team) => ({ roundId: nextRound.id, teamId: team.id })),
+      data: game.teams.map((team) => ({
+        roundId: nextRound.id,
+        teamId: team.id,
+        vehicleSection: getEmptyVehicleSection() as unknown as Prisma.InputJsonValue,
+        rdSection: getEmptyRdSection() as unknown as Prisma.InputJsonValue,
+        manufacturingSection: getEmptyManufacturingSection() as unknown as Prisma.InputJsonValue,
+        productionSection: getEmptyProductionSection() as unknown as Prisma.InputJsonValue,
+        marketingSection: getEmptyMarketingSection() as unknown as Prisma.InputJsonValue,
+        lobbyingSection: getEmptyLobbyingSection() as unknown as Prisma.InputJsonValue,
+      })),
       skipDuplicates: true,
     });
   }
