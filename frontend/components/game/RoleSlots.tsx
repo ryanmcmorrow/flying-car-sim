@@ -30,6 +30,7 @@ export function RoleSlots({
           return (
             <button
               key={role}
+              type="button"
               onClick={() => onSelect?.(role)}
               className="w-full text-left p-3 border-2 transition-none"
               style={{
