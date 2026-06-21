@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { RoleSlots } from "@/components/game/RoleSlots";
 import type { TeamMemberRole } from "@/app/generated/prisma/client";
 import { ROLE_COLORS } from "@/lib/game-utils";
@@ -20,6 +21,16 @@ interface Team {
   members: TeamMember[];
 }
 
+interface Round {
+  id: string;
+  roundNumber: number;
+  status: string;
+  worldEvent: Record<string, unknown> | null;
+  openedAt: string | null;
+  resolvedAt: string | null;
+  submittedCount: number;
+}
+
 interface GameData {
   id: string;
   code: string;
@@ -27,13 +38,7 @@ interface GameData {
   currentRound: number;
   settings: Record<string, unknown>;
   teams: Team[];
-  rounds: {
-    id: string;
-    roundNumber: number;
-    status: string;
-    worldEvent: Record<string, unknown> | null;
-    openedAt: string | null;
-  }[];
+  rounds: Round[];
 }
 
 interface StartResult {
@@ -52,15 +57,23 @@ interface Props {
 }
 
 export function FacilitatorLobbyClient({ game: initialGame }: Props) {
+  const router = useRouter();
   const [game, setGame] = useState<GameData>(initialGame);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState("");
   const [startResult, setStartResult] = useState<StartResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState("");
+  const [justResolved, setJustResolved] = useState<number | null>(null);
 
   const hasCEO = game.teams.some((t) =>
     t.members.some((m) => m.role === "CEO")
   );
+
+  const currentRoundData = game.rounds.find(
+    (r) => r.roundNumber === game.currentRound
+  ) ?? null;
 
   const refreshGame = useCallback(async () => {
     try {
@@ -74,9 +87,9 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
     }
   }, [game.id]);
 
-  // Poll every 3 seconds while in LOBBY
+  // Poll every 3s in LOBBY or ACTIVE
   useEffect(() => {
-    if (game.status !== "LOBBY") return;
+    if (game.status === "COMPLETED") return;
     const interval = setInterval(refreshGame, 3000);
     return () => clearInterval(interval);
   }, [game.status, refreshGame]);
@@ -85,9 +98,7 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
     setStartError("");
     setStarting(true);
     try {
-      const res = await fetch(`/api/games/${game.id}/start`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/games/${game.id}/start`, { method: "POST" });
       const body = await res.json();
       if (!res.ok) {
         setStartError(body.error ?? "START FAILED");
@@ -95,10 +106,34 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
       }
       setStartResult(body);
       setGame((prev) => ({ ...prev, status: "ACTIVE" }));
+      await refreshGame();
     } catch {
       setStartError("CONNECTION ERROR");
     } finally {
       setStarting(false);
+    }
+  }
+
+  async function handleResolve() {
+    setResolveError("");
+    setResolving(true);
+    const roundBeingResolved = game.currentRound;
+    try {
+      const res = await fetch(`/api/games/${game.id}/resolve`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) {
+        setResolveError(body.error ?? "RESOLVE FAILED");
+        return;
+      }
+      setJustResolved(roundBeingResolved);
+      await refreshGame();
+      if (body.gameComplete) {
+        router.push(`/results/${game.id}/${roundBeingResolved}`);
+      }
+    } catch {
+      setResolveError("CONNECTION ERROR");
+    } finally {
+      setResolving(false);
     }
   }
 
@@ -108,10 +143,13 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  const pxFont = "var(--font-pixel), monospace";
+  const bodyFont = "var(--font-pixel-body), monospace";
+
   return (
     <div
       className="game-screen scanlines min-h-screen"
-      style={{ fontFamily: "var(--font-pixel-body), monospace" }}
+      style={{ fontFamily: bodyFont }}
     >
       <div
         style={{
@@ -125,19 +163,11 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
         }}
       />
 
-      <div
-        className="max-w-4xl mx-auto px-4 py-8 relative"
-        style={{ zIndex: 1 }}
-      >
+      <div className="max-w-4xl mx-auto px-4 py-8 relative" style={{ zIndex: 1 }}>
         {/* Back */}
         <Link
           href="/game/facilitator"
-          style={{
-            fontFamily: "var(--font-pixel), monospace",
-            fontSize: "0.45rem",
-            color: "#4a4a6a",
-            textDecoration: "none",
-          }}
+          style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#4a4a6a", textDecoration: "none" }}
         >
           ← COMMAND CENTER
         </Link>
@@ -145,17 +175,11 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
         {/* Header */}
         <div className="flex items-start justify-between mt-4 mb-6">
           <div>
-            <h1
-              className="pixel-heading"
-              style={{ fontSize: "0.85rem", lineHeight: 1.8 }}
-            >
-              GAME LOBBY
+            <h1 className="pixel-heading" style={{ fontSize: "0.85rem", lineHeight: 1.8 }}>
+              {game.status === "LOBBY" ? "GAME LOBBY" : game.status === "ACTIVE" ? "GAME CONTROL" : "GAME COMPLETE"}
             </h1>
             <div className="flex items-center gap-3 mt-2">
-              <span
-                className="pixel-heading"
-                style={{ fontSize: "1.6rem", letterSpacing: "0.35em", color: "#ffbe0b" }}
-              >
+              <span className="pixel-heading" style={{ fontSize: "1.6rem", letterSpacing: "0.35em", color: "#ffbe0b" }}>
                 {game.code}
               </span>
               <button
@@ -178,17 +202,11 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
             </p>
           </div>
 
+          {/* LOBBY: Start Game button */}
           {game.status === "LOBBY" && (
             <div className="text-right">
               {!hasCEO && (
-                <p
-                  style={{
-                    fontFamily: "var(--font-pixel), monospace",
-                    fontSize: "0.42rem",
-                    color: "#ff006e",
-                    marginBottom: "0.5rem",
-                  }}
-                >
+                <p style={{ fontFamily: pxFont, fontSize: "0.42rem", color: "#ff006e", marginBottom: "0.5rem" }}>
                   ⚠ NEED CEO ON ≥1 TEAM
                 </p>
               )}
@@ -201,14 +219,7 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
                 {starting ? "STARTING..." : "▶ START GAME"}
               </button>
               {startError && (
-                <p
-                  style={{
-                    fontFamily: "var(--font-pixel), monospace",
-                    fontSize: "0.42rem",
-                    color: "#ff006e",
-                    marginTop: "0.5rem",
-                  }}
-                >
+                <p style={{ fontFamily: pxFont, fontSize: "0.42rem", color: "#ff006e", marginTop: "0.5rem" }}>
                   ❌ {startError}
                 </p>
               )}
@@ -221,14 +232,7 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
         {/* Start result — world event + briefing */}
         {startResult && (
           <div className="pixel-transmission pixel-slide-in mb-6">
-            <p
-              style={{
-                fontFamily: "var(--font-pixel), monospace",
-                fontSize: "0.55rem",
-                color: "#39ff14",
-                marginBottom: "0.75rem",
-              }}
-            >
+            <p style={{ fontFamily: pxFont, fontSize: "0.55rem", color: "#39ff14", marginBottom: "0.75rem" }}>
               ★ GAME STARTED — YEAR 1 WORLD EVENT ★
             </p>
             <p style={{ fontSize: "1.2rem", color: "#00f5ff", marginBottom: "0.25rem" }}>
@@ -237,78 +241,174 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
             <p style={{ fontSize: "1rem", color: "#cccccc", marginBottom: "1rem" }}>
               {startResult.worldEvent.description}
             </p>
+            <div style={{ borderTop: "2px solid #39ff14", paddingTop: "0.75rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", fontSize: "1rem" }}>
+              <div><span style={{ color: "#888899" }}>TOTAL DEMAND:</span>{" "}<span style={{ color: "#ffbe0b" }}>{startResult.briefing.totalFlyingCarDemand.toLocaleString()}</span></div>
+              <div><span style={{ color: "#888899" }}>ECONOMY:</span>{" "}<span style={{ color: "#39ff14", textTransform: "uppercase" }}>{startResult.briefing.economicCondition}</span></div>
+              <div><span style={{ color: "#888899" }}>PUBLIC PERCEPTION:</span>{" "}<span style={{ color: "#00f5ff" }}>{startResult.briefing.publicPerception}%</span></div>
+              <div><span style={{ color: "#888899" }}>POLICY SCORE:</span>{" "}<span style={{ color: "#ff006e" }}>{startResult.briefing.policyScore}</span></div>
+            </div>
+          </div>
+        )}
+
+        {/* ACTIVE: Round control panel */}
+        {game.status === "ACTIVE" && currentRoundData && (
+          <div className="mb-6">
             <div
-              style={{
-                borderTop: "2px solid #39ff14",
-                paddingTop: "0.75rem",
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "0.5rem",
-                fontSize: "1rem",
-              }}
+              className="pixel-card mb-4"
+              style={{ borderColor: "#00f5ff", boxShadow: "4px 4px 0 #003d4a" }}
             >
-              <div>
-                <span style={{ color: "#888899" }}>TOTAL DEMAND:</span>{" "}
-                <span style={{ color: "#ffbe0b" }}>
-                  {startResult.briefing.totalFlyingCarDemand.toLocaleString()}
-                </span>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <p style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#888", marginBottom: "0.25rem" }}>
+                    CURRENT ROUND
+                  </p>
+                  <p style={{ fontFamily: pxFont, fontSize: "1rem", color: "#00f5ff" }}>
+                    YEAR {game.currentRound} / 8
+                  </p>
+                </div>
+
+                {/* Submission progress */}
+                <div className="text-center">
+                  <p style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#888", marginBottom: "0.25rem" }}>
+                    TEAMS SUBMITTED
+                  </p>
+                  <p style={{ fontFamily: pxFont, fontSize: "1rem", color: currentRoundData.submittedCount === game.teams.length ? "#39ff14" : "#ffbe0b" }}>
+                    {currentRoundData.submittedCount} / {game.teams.length}
+                  </p>
+                </div>
+
+                {/* Round status */}
+                <div className="text-center">
+                  <p style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#888", marginBottom: "0.25rem" }}>
+                    ROUND STATUS
+                  </p>
+                  <span
+                    className={`pixel-badge ${currentRoundData.status === "RESOLVED" ? "status-completed" : currentRoundData.status === "OPEN" ? "status-active" : "status-lobby"}`}
+                    style={{ fontSize: "0.45rem" }}
+                  >
+                    {currentRoundData.status}
+                  </span>
+                </div>
+
+                {/* Resolve / Results */}
+                <div className="flex flex-col gap-2 items-end">
+                  {currentRoundData.status !== "RESOLVED" && (
+                    <>
+                      <button
+                        onClick={handleResolve}
+                        disabled={resolving}
+                        className="pixel-btn pixel-btn-pink"
+                        style={{ fontSize: "0.5rem" }}
+                      >
+                        {resolving ? "RESOLVING..." : "⚡ RESOLVE ROUND"}
+                      </button>
+                      {currentRoundData.submittedCount < game.teams.length && (
+                        <p style={{ fontFamily: pxFont, fontSize: "0.38rem", color: "#ffbe0b" }}>
+                          ⚠ {game.teams.length - currentRoundData.submittedCount} TEAM{game.teams.length - currentRoundData.submittedCount !== 1 ? "S" : ""} NOT YET SUBMITTED
+                        </p>
+                      )}
+                      {resolveError && (
+                        <p style={{ fontFamily: pxFont, fontSize: "0.4rem", color: "#ff006e" }}>
+                          ❌ {resolveError}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {(currentRoundData.status === "RESOLVED" || justResolved === game.currentRound - 1) && (
+                    <Link
+                      href={`/results/${game.id}/${justResolved ?? game.currentRound - 1}`}
+                      className="pixel-btn pixel-btn-green"
+                      style={{ fontSize: "0.5rem", textDecoration: "none", display: "inline-block" }}
+                    >
+                      📊 VIEW RESULTS
+                    </Link>
+                  )}
+                </div>
               </div>
+
+              {/* World event for current round */}
+              {currentRoundData.worldEvent && (
+                <div
+                  className="mt-4 pt-4"
+                  style={{ borderTop: "1px solid #333" }}
+                >
+                  <p style={{ fontFamily: pxFont, fontSize: "0.42rem", color: "#c77dff", marginBottom: "0.25rem" }}>
+                    ACTIVE WORLD EVENT
+                  </p>
+                  <p style={{ fontSize: "1rem", color: "#fff" }}>
+                    {String(currentRoundData.worldEvent.title ?? "")}
+                  </p>
+                  <p style={{ fontSize: "0.9rem", color: "#aaa", marginTop: "0.2rem" }}>
+                    {String(currentRoundData.worldEvent.description ?? "")}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Past rounds */}
+            {game.rounds.filter((r) => r.status === "RESOLVED").length > 0 && (
               <div>
-                <span style={{ color: "#888899" }}>ECONOMY:</span>{" "}
-                <span style={{ color: "#39ff14", textTransform: "uppercase" }}>
-                  {startResult.briefing.economicCondition}
-                </span>
+                <p style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#4a4a6a", marginBottom: "0.5rem" }}>
+                  PAST ROUNDS
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {game.rounds
+                    .filter((r) => r.status === "RESOLVED")
+                    .map((r) => (
+                      <Link
+                        key={r.id}
+                        href={`/results/${game.id}/${r.roundNumber}`}
+                        className="pixel-btn"
+                        style={{ fontSize: "0.42rem", textDecoration: "none" }}
+                      >
+                        YEAR {r.roundNumber} RESULTS →
+                      </Link>
+                    ))}
+                </div>
               </div>
-              <div>
-                <span style={{ color: "#888899" }}>PUBLIC PERCEPTION:</span>{" "}
-                <span style={{ color: "#00f5ff" }}>
-                  {startResult.briefing.publicPerception}%
-                </span>
-              </div>
-              <div>
-                <span style={{ color: "#888899" }}>POLICY SCORE:</span>{" "}
-                <span style={{ color: "#ff006e" }}>
-                  {startResult.briefing.policyScore}
-                </span>
-              </div>
+            )}
+          </div>
+        )}
+
+        {/* COMPLETED */}
+        {game.status === "COMPLETED" && (
+          <div className="pixel-card pixel-card-green mb-6 text-center">
+            <p className="pixel-heading" style={{ fontSize: "0.8rem", color: "var(--px-green)", marginBottom: "1rem" }}>
+              ★ GAME COMPLETE ★
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center">
+              {game.rounds
+                .filter((r) => r.status === "RESOLVED")
+                .map((r) => (
+                  <Link
+                    key={r.id}
+                    href={`/results/${game.id}/${r.roundNumber}`}
+                    className="pixel-btn pixel-btn-cyan"
+                    style={{ fontSize: "0.45rem", textDecoration: "none" }}
+                  >
+                    YEAR {r.roundNumber}
+                  </Link>
+                ))}
             </div>
           </div>
         )}
 
         {/* Teams roster */}
         <div className="mt-6">
-          <p
-            className="pixel-heading mb-4"
-            style={{ fontSize: "0.5rem", color: "#4a4a6a" }}
-          >
+          <p className="pixel-heading mb-4" style={{ fontSize: "0.5rem", color: "#4a4a6a" }}>
             TEAM ROSTER ({game.teams.length} TEAM{game.teams.length !== 1 ? "S" : ""})
           </p>
 
           {game.teams.length === 0 ? (
-            <div
-              className="pixel-card text-center py-10"
-              style={{ borderColor: "#4a4a6a" }}
-            >
-              <p
-                className="pixel-heading"
-                style={{ fontSize: "0.5rem", color: "#4a4a6a" }}
-              >
+            <div className="pixel-card text-center py-10" style={{ borderColor: "#4a4a6a" }}>
+              <p className="pixel-heading" style={{ fontSize: "0.5rem", color: "#4a4a6a" }}>
                 WAITING FOR PLAYERS...
               </p>
               <p style={{ color: "#4a4a6a", fontSize: "1rem", marginTop: "0.75rem" }}>
                 Share the code <span style={{ color: "#ffbe0b" }}>{game.code}</span> to get started.
               </p>
               {game.status === "LOBBY" && (
-                <span
-                  className="blink"
-                  style={{
-                    display: "inline-block",
-                    marginTop: "1rem",
-                    fontFamily: "var(--font-pixel), monospace",
-                    fontSize: "0.4rem",
-                    color: "#4a4a6a",
-                  }}
-                >
+                <span className="blink" style={{ display: "inline-block", marginTop: "1rem", fontFamily: pxFont, fontSize: "0.4rem", color: "#4a4a6a" }}>
                   ■ POLLING FOR PLAYERS...
                 </span>
               )}
@@ -321,44 +421,33 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
                   <div
                     key={team.id}
                     className="pixel-card"
-                    style={{
-                      borderColor: hasCEOOnTeam ? "#39ff14" : "#ffbe0b",
-                      boxShadow: `4px 4px 0 ${hasCEOOnTeam ? "#1d8009" : "#7d5d00"}`,
-                    }}
+                    style={{ borderColor: hasCEOOnTeam ? "#39ff14" : "#ffbe0b", boxShadow: `4px 4px 0 ${hasCEOOnTeam ? "#1d8009" : "#7d5d00"}` }}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <span
-                          className="pixel-heading"
-                          style={{ fontSize: "0.75rem", color: "#ffffff" }}
-                        >
+                        <span className="pixel-heading" style={{ fontSize: "0.75rem", color: "#ffffff" }}>
                           {team.brandName}
                         </span>
                         {!hasCEOOnTeam && (
-                          <span
-                            style={{
-                              fontFamily: "var(--font-pixel), monospace",
-                              fontSize: "0.4rem",
-                              color: "#ff006e",
-                              marginLeft: "0.75rem",
-                            }}
-                          >
+                          <span style={{ fontFamily: pxFont, fontSize: "0.4rem", color: "#ff006e", marginLeft: "0.75rem" }}>
                             ⚠ NO CEO
                           </span>
                         )}
                       </div>
-                      <span
-                        style={{ fontSize: "0.9rem", color: "#4a4a6a" }}
-                      >
-                        {team.members.length}/5 MEMBERS
-                      </span>
+                      <div className="flex items-center gap-3">
+                        {game.status === "ACTIVE" && (
+                          <span style={{ fontFamily: bodyFont, fontSize: "0.9rem", color: "#ffbe0b" }}>
+                            ${(parseFloat(team.cash) / 1_000_000).toFixed(1)}M
+                          </span>
+                        )}
+                        <span style={{ fontSize: "0.9rem", color: "#4a4a6a" }}>
+                          {team.members.length}/5 MEMBERS
+                        </span>
+                      </div>
                     </div>
 
                     <RoleSlots
-                      filledRoles={team.members.map((m) => ({
-                        role: m.role as TeamMemberRole,
-                        userName: m.userName,
-                      }))}
+                      filledRoles={team.members.map((m) => ({ role: m.role as TeamMemberRole, userName: m.userName }))}
                       interactive={false}
                     />
                   </div>
@@ -375,13 +464,7 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
             {Object.entries(ROLE_COLORS).map(([role, color]) => (
               <span
                 key={role}
-                style={{
-                  fontFamily: "var(--font-pixel), monospace",
-                  fontSize: "0.45rem",
-                  color,
-                  border: `2px solid ${color}`,
-                  padding: "0.2rem 0.5rem",
-                }}
+                style={{ fontFamily: pxFont, fontSize: "0.45rem", color, border: `2px solid ${color}`, padding: "0.2rem 0.5rem" }}
               >
                 {role}
               </span>

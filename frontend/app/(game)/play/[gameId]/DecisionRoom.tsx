@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { TeamMemberRole } from "@/app/generated/prisma/client";
 import type {
   VehicleSection,
@@ -115,6 +116,25 @@ export function DecisionRoom({
   );
 
   const [activeTab, setActiveTab] = useState<TeamMemberRole>(myRole);
+  const router = useRouter();
+
+  // After submitting, poll until round resolves then redirect to results
+  useEffect(() => {
+    if (!submittedAt) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/play/${gameId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.round?.status === "RESOLVED") {
+          router.push(`/results/${gameId}/${data.round.roundNumber}`);
+        }
+      } catch {
+        // ignore poll errors
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [submittedAt, gameId, router]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
 

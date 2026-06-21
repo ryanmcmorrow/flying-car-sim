@@ -58,6 +58,8 @@ export default async function FacilitatorGameLobbyPage({ params }: Props) {
       status: r.status as string,
       worldEvent: r.worldEvent as Record<string, unknown> | null,
       openedAt: r.openedAt?.toISOString() ?? null,
+      resolvedAt: r.resolvedAt?.toISOString() ?? null,
+      submittedCount: 0,
     })),
   };
 

@@ -792,13 +792,21 @@ export function RoundReport({
             CONTINUE TO NEXT ROUND →
           </button>
         ) : (
-          <button
-            onClick={() => router.push(`/facilitator`)}
-            className="px-8 py-4 text-xs border-2 border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-black transition-colors"
-            style={{ fontFamily: pxFont }}
-          >
-            FINAL LEADERBOARD
-          </button>
+          <div className="flex flex-col items-center gap-4">
+            <div
+              className="px-6 py-3 border-2 border-yellow-400 text-center"
+              style={{ fontFamily: pxFont, fontSize: "0.6rem", color: "#ffbe0b" }}
+            >
+              ★ GAME COMPLETE — FINAL STANDINGS ABOVE ★
+            </div>
+            <button
+              onClick={() => router.push(`/game`)}
+              className="px-6 py-3 text-xs border border-gray-600 text-gray-400 hover:text-white transition-colors"
+              style={{ fontFamily: pxFont }}
+            >
+              ← BACK TO DASHBOARD
+            </button>
+          </div>
         )}
       </div>
     </div>

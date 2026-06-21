@@ -25,6 +25,7 @@ export async function GET(
         orderBy: { createdAt: "asc" },
       },
       rounds: {
+        include: { decisions: { select: { submittedAt: true } } },
         orderBy: { roundNumber: "asc" },
       },
     },
@@ -73,6 +74,7 @@ export async function GET(
       worldEvent: r.worldEvent,
       openedAt: r.openedAt?.toISOString() ?? null,
       resolvedAt: r.resolvedAt?.toISOString() ?? null,
+      submittedCount: r.decisions.filter((d) => d.submittedAt !== null).length,
     })),
   });
 }
