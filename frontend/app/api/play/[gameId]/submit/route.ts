@@ -3,8 +3,10 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resolveGameById } from "@/lib/resolve-game";
 import { computeSpaceCost, parseFacilities } from "@/lib/engine/financials";
+import { computeModelUnitCost } from "@/lib/decision-utils";
+import { RD_RECURRING_COSTS } from "@/lib/engine/constants";
 import type { TeamInput } from "@/lib/engine/types";
-import type { VehicleSection, ManufacturingSection, ProductionSection } from "@/types/decisions";
+import type { VehicleSection, RdSection, ManufacturingSection, ProductionSection, MarketingSection, LobbyingSection } from "@/types/decisions";
 
 // POST /api/play/[gameId]/submit — CEO submits the round
 export async function POST(
@@ -135,6 +137,46 @@ export async function POST(
     return NextResponse.json(
       {
         error: `Production (${totalProduction.toLocaleString()} units) exceeds factory capacity (${capacity.toLocaleString()} units). Add facilities in the COO tab or reduce production runs.`,
+      },
+      { status: 422 }
+    );
+  }
+
+  // Financial guard: estimate total up-front costs and block if they exceed cash.
+  // Revenue will partially offset this, but we enforce a floor so teams can't
+  // manufacture their way to -$10B in a single round.
+  const rdSection = decision.rdSection as unknown as RdSection;
+  const marketingSection = decision.marketingSection as unknown as MarketingSection;
+  const lobbyingSection = decision.lobbyingSection as unknown as LobbyingSection;
+
+  const spaceCosts = computeSpaceCost({
+    currentFacilities: parseFacilities(teamSpaces?.[member.teamId]),
+    manufacturingSection: mfgSection,
+  } as TeamInput).totalCost;
+
+  const estimatedCogs = (mfgSection?.productionRuns ?? []).reduce((sum, run) => {
+    const vm = vehicleSection.models.find((m) => m.id === run.modelId);
+    if (!vm) return sum;
+    return sum + computeModelUnitCost(vm) * (run.units ?? 0);
+  }, 0);
+
+  const rdRecurring = rdSection?.recurring ?? {};
+  const rdCosts = Object.entries(rdRecurring).reduce(
+    (sum: number, [key, active]) => sum + (active ? (RD_RECURRING_COSTS[key] ?? 0) : 0),
+    0
+  );
+
+  const estimatedTotalCosts =
+    estimatedCogs + spaceCosts + rdCosts +
+    (marketingSection?.totalBudget ?? 0) +
+    (lobbyingSection?.lobbyingSpend ?? 0);
+
+  const teamCash = parseFloat(member.team.cash.toString());
+  if (estimatedTotalCosts > teamCash) {
+    const shortfall = Math.round((estimatedTotalCosts - teamCash) / 1_000_000);
+    return NextResponse.json(
+      {
+        error: `These decisions would cost ~$${Math.round(estimatedTotalCosts / 1_000_000)}M but your team only has $${Math.round(teamCash / 1_000_000)}M. Reduce production, downsize facilities, or cut spend by ~$${shortfall}M.`,
       },
       { status: 422 }
     );

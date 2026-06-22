@@ -97,8 +97,8 @@ model Team {
   gameId    String
   game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
   brandName String   @db.VarChar(30)
-  /// Starting cash: $100,000,000
-  cash      Decimal  @default(100000000) @db.Decimal(18, 2)
+  /// Starting cash: $500,000,000
+  cash      Decimal  @default(500000000) @db.Decimal(18, 2)
   createdAt DateTime @default(now())
 
   members       TeamMember[]

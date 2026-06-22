@@ -77,6 +77,24 @@ export default async function PlayPage({ params }: PageProps) {
     );
   }
 
+  // If the previous round just resolved and this team hasn't started round N yet,
+  // send them to the results page so they don't skip the round report.
+  if (round.roundNumber > 1) {
+    const prevRound = game.rounds.find((r) => r.roundNumber === round.roundNumber - 1);
+    if (prevRound) {
+      const [prevResult, existingDecision] = await Promise.all([
+        db.roundResult.findFirst({ where: { roundId: prevRound.id, teamId: team.id }, select: { id: true } }),
+        db.decision.findUnique({ where: { roundId_teamId: { roundId: round.id, teamId: team.id } }, select: { submittedAt: true, vehicleSection: true } }),
+      ]);
+      const hasStartedCurrentRound =
+        existingDecision &&
+        ((existingDecision.vehicleSection as { models?: unknown[] } | null)?.models?.length ?? 0) > 0;
+      if (prevResult && !hasStartedCurrentRound) {
+        redirect(`/results/${gameId}/${prevRound.roundNumber}`);
+      }
+    }
+  }
+
   // Upsert decision record with empty defaults
   const decision = await db.decision.upsert({
     where: { roundId_teamId: { roundId: round.id, teamId: team.id } },
