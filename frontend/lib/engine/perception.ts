@@ -88,11 +88,11 @@ export function computeBrandPerceptionDelta(params: {
   if (isAttackAd && Math.random() < attackBackfireChance) {
     marketingEffect = -(brandMarketingSpend / 10_000_000) * 1.5;
   }
-  // Incoming attack
-  const attackPenalty =
-    incomingAttackSpend > 0
-      ? (incomingAttackSpend / 10_000_000) * 1.5
-      : 0;
+  // Incoming attack — sqrt curve for diminishing returns on perception damage too.
+  // $10M attack → ~2pts damage, $40M → ~4pts, $160M → ~8pts (not 24pts linearly).
+  const attackPenalty = incomingAttackSpend > 0
+    ? Math.sqrt(incomingAttackSpend / 10_000_000) * 2
+    : 0;
   marketingEffect -= attackPenalty;
 
   // Brand decay — perception erodes 8% per round toward 0.

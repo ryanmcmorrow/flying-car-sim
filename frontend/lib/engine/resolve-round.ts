@@ -327,6 +327,15 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     };
   }
 
+  // Pre-compute total attack spend aimed at each team (used in Step 8 and brand delta)
+  const incomingAttackSpendByTeamId: Record<string, number> = {};
+  for (const team of teams) {
+    const mkt = teamMarketingCalcs[team.teamId];
+    if (!mkt?.isAttack || !mkt.attackTargetTeamId) continue;
+    incomingAttackSpendByTeamId[mkt.attackTargetTeamId] =
+      (incomingAttackSpendByTeamId[mkt.attackTargetTeamId] ?? 0) + mkt.brandSpend;
+  }
+
   // ── Step 8: Market share per team × type × region ─────────────────────────
   const unitsDemandedByModelByRegion: Record<string, Record<string, Record<Region, number>>> = {};
   const effectivePriceByModelByRegion: Record<string, Record<string, Record<Region, number>>> = {};
@@ -417,13 +426,22 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
 
         // Diminishing returns: sqrt curve so doubling spend ≠ doubling share.
         // Each $1M = 1 unit of "effective spend"; sqrt(25M) = 5, sqrt(100M) = 10.
+        // Attack ads from competitors partially cancel this team's brand spend.
+        // Attack effect also has diminishing returns (sqrt) — can't fully zero out a
+        // well-funded brand, but $36M of attacks against $10M of spend hurts badly.
         let marketingShareRaw: number;
         if (!anyBrandSpend) {
           marketingShareRaw = 1.0;
         } else {
-          const effectiveSpend = c.marketingSpend > 0
-            ? Math.sqrt(c.marketingSpend / 1_000_000)
-            : 0.1; // no-spend floor keeps you on the board at ~1/10 the minimum
+          const rawSpend = c.marketingSpend;
+          const attackSpend = incomingAttackSpendByTeamId[c.team.teamId] ?? 0;
+          // Attacks cancel up to 70% of the target's brand spend; sqrt curve on attack
+          const attackCancelFraction = attackSpend > 0
+            ? Math.min(0.70, Math.sqrt(attackSpend / 1_000_000) / Math.max(1, Math.sqrt(rawSpend / 1_000_000)))
+            : 0;
+          const effectiveSpend = rawSpend > 0
+            ? Math.sqrt(rawSpend * (1 - attackCancelFraction) / 1_000_000)
+            : 0.1;
           marketingShareRaw = effectiveSpend * crowdingFactor;
         }
 
@@ -749,16 +767,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
 
     // Brand perception
     const brandPerceptionStart = teamBrandPerceptions[team.teamId] ?? 0;
-    const incomingAttackSpend = teams.reduce((sum, otherTeam) => {
-      const otherMkt = teamMarketingCalcs[otherTeam.teamId];
-      if (
-        otherMkt?.isAttack &&
-        otherMkt.attackTargetTeamId === team.teamId
-      ) {
-        return sum + otherMkt.brandSpend;
-      }
-      return sum;
-    }, 0);
+    const incomingAttackSpend = incomingAttackSpendByTeamId[team.teamId] ?? 0;
 
     const brandDelta = computeBrandPerceptionDelta({
       team,

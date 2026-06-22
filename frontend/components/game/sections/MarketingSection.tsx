@@ -109,39 +109,39 @@ export function MarketingSection({
         </p>
       </div>
 
-      {/* Category / Brand Split */}
+      {/* Brand ↔ Category slider */}
       {(() => {
-        const split = Math.min(100, Math.max(0, value.categorySplit ?? 0));
-        const catAmt = Math.round((value.totalBudget ?? 0) * split / 100);
-        const brandAmt = (value.totalBudget ?? 0) - catAmt;
+        const total = value.totalBudget ?? 0;
+        const split = value.categorySplit ?? 0;
+        const catAmt = Math.round(total * split / 100);
+        const brandAmt = total - catAmt;
         return (
           <div>
             <label className="pixel-label">
-              CATEGORY SPLIT (%) <Tooltip text="What % of your budget goes to category marketing — growing the total flying car market for everyone. The rest goes to brand marketing, which shifts demand in your favour." />
+              SPEND MIX <Tooltip text="Slide toward CATEGORY to grow the total flying car market for everyone. Slide toward BRAND to win demand specifically for you. Both matter — category is a bet on the pie, brand is a bet on your slice." />
             </label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={split || ""}
-              disabled={disabled}
-              placeholder="0"
-              onChange={(e) => {
-                const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-                onChange({ ...value, categorySplit: v });
-              }}
-              className="pixel-input"
-              style={{ maxWidth: 120 }}
-            />
-            {(value.totalBudget ?? 0) > 0 && (
-              <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: "var(--px-gray)", marginTop: "0.3rem" }}>
-                ${(catAmt / 1_000_000).toFixed(1)}M category (grows the market) · ${(brandAmt / 1_000_000).toFixed(1)}M brand (wins your share)
-              </p>
-            )}
-            {(value.totalBudget ?? 0) === 0 && (
-              <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: "var(--px-gray)", marginTop: "0.3rem" }}>
-                Set a total budget above to see the split.
-              </p>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <span style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.45rem", color: "var(--px-cyan)", minWidth: 44, textAlign: "right" }}>BRAND</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={split}
+                disabled={disabled}
+                onChange={(e) => onChange({ ...value, categorySplit: parseInt(e.target.value) })}
+                className="pixel-slider"
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.45rem", color: "var(--px-green)", minWidth: 60 }}>CATEGORY</span>
+            </div>
+            {total > 0 ? (
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.4rem", fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.8rem" }}>
+                <span style={{ color: "var(--px-cyan)" }}>${(brandAmt / 1_000_000).toFixed(1)}M brand</span>
+                <span style={{ color: "var(--px-green)" }}>${(catAmt / 1_000_000).toFixed(1)}M market growth</span>
+              </div>
+            ) : (
+              <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.8rem", color: "var(--px-gray)", marginTop: "0.4rem" }}>Set a total budget above first.</p>
             )}
           </div>
         );
@@ -193,7 +193,7 @@ export function MarketingSection({
 
       {/* Channel Allocation */}
       <div>
-        <label className="pixel-label">CHANNEL ALLOCATION ($) <Tooltip text="Spread your budget across channels. Each channel has a minimum effective spend — allocating below minimum wastes the money. Total must not exceed your budget." /></label>
+        <label className="pixel-label">BRAND CHANNEL ALLOCATION ($) <Tooltip text="How your brand spend reaches buyers — each channel targets a different audience. Channels only apply to your brand spend (the portion not going to market growth above). Category spend is always national/broad." /></label>
         <div className="space-y-3">
           {(Object.keys(value.channels) as Array<keyof typeof value.channels>).map(
             (ch) => {
@@ -329,7 +329,8 @@ export function MarketingSection({
                     type="number"
                     min={0}
                     max={100}
-                    value={pct}
+                    value={pct || ""}
+                    placeholder="0"
                     disabled={disabled}
                     onChange={(e) =>
                       setRegion(region, parseInt(e.target.value) || 0)

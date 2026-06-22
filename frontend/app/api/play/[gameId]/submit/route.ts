@@ -41,7 +41,10 @@ export async function POST(
   // Find the active round
   const game = await db.game.findUnique({
     where: { id: gameId },
-    include: { rounds: { orderBy: { roundNumber: "asc" } } },
+    include: {
+      rounds: { orderBy: { roundNumber: "asc" } },
+      teams: { select: { id: true } },
+    },
   });
 
   if (!game) {
@@ -145,14 +148,13 @@ export async function POST(
 
   // PARTY mode: auto-resolve when all teams have submitted
   if (game.mode === "PARTY") {
-    const allDecisions = await db.decision.findMany({
-      where: { roundId: round.id },
-      select: { submittedAt: true },
+    const submittedCount = await db.decision.count({
+      where: { roundId: round.id, submittedAt: { not: null } },
     });
-    const allSubmitted = allDecisions.length > 0 && allDecisions.every((d) => d.submittedAt !== null);
-    if (allSubmitted) {
-      // Fire-and-forget: if it fails the cron will catch it
-      resolveGameById(gameId).catch((err) => console.error("[submit] auto-resolve failed:", err));
+    if (submittedCount === game.teams.length) {
+      resolveGameById(gameId).catch((err) =>
+        console.error("[submit] auto-resolve failed:", err)
+      );
     }
   }
 

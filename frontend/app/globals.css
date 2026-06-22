@@ -433,6 +433,42 @@
   box-shadow: 0 0 0 2px var(--px-cyan);
 }
 
+/* ── Brand ↔ Category slider ── */
+.pixel-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 0;
+  background: linear-gradient(to right, var(--px-cyan) 0%, #334455 40%, #334455 60%, var(--px-green) 100%);
+  outline: none;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+.pixel-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--px-white);
+  border: 3px solid var(--px-bg);
+  box-shadow: 0 0 0 2px var(--px-amber);
+  cursor: pointer;
+  border-radius: 0;
+}
+.pixel-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--px-white);
+  border: 3px solid var(--px-bg);
+  box-shadow: 0 0 0 2px var(--px-amber);
+  cursor: pointer;
+  border-radius: 0;
+}
+.pixel-slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── Hide number input spinners globally ── */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {

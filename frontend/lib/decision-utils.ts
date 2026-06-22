@@ -41,7 +41,7 @@ export function getEmptyProductionSection(): ProductionSection {
 export function getEmptyMarketingSection(): MarketingSection {
   return {
     totalBudget: 0,
-    categorySplit: 0,
+    categorySplit: 50,
     tone: "positive",
     channels: {
       tv_online: 0,

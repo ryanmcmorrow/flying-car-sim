@@ -147,7 +147,7 @@ export function ReadOnlySection({
     return (
       <div className="space-y-2">
         <Row label="BUDGET" value={fmtM(d.totalBudget)} />
-        <Row label="CATEGORY SPLIT" value={`${d.categorySplit ?? 0}%`} />
+        <Row label="CATEGORY" value={`${d.categorySplit ?? 0}%`} />
         <Row label="TONE" value={d.tone.toUpperCase()} />
         <Row label="REGIONAL" value={d.regionalTargeting.toUpperCase()} />
         <Row label="TV/ONLINE" value={fmtM(d.channels.tv_online)} />
