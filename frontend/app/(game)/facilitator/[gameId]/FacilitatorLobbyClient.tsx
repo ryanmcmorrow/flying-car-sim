@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RoleSlots } from "@/components/game/RoleSlots";
 import type { TeamMemberRole } from "@/app/generated/prisma/client";
-import { ROLE_COLORS } from "@/lib/game-utils";
+import { ROLE_COLORS, ALL_ROLES } from "@/lib/game-utils";
+import { SignOutButton } from "@/components/game/SignOutButton";
+import { parseJSON } from "@/lib/api";
 
 const pxFont = "var(--font-pixel), monospace";
 const bodyFont = "var(--font-pixel-body), monospace";
@@ -47,9 +49,11 @@ interface GameData {
 
 interface Props {
   game: GameData;
+  myUserId: string;
 }
 
-export function FacilitatorLobbyClient({ game: initialGame }: Props) {
+
+export function FacilitatorLobbyClient({ game: initialGame, myUserId }: Props) {
   const router = useRouter();
   const [game, setGame] = useState<GameData>(initialGame);
   const [starting, setStarting] = useState(false);
@@ -60,6 +64,36 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
   const [resolveError, setResolveError] = useState("");
   const [justResolved, setJustResolved] = useState<number | null>(null);
   const [kicking, setKicking] = useState<string | null>(null);
+
+  // Facilitator-as-player join state (classroom mode)
+  const [joinBrand, setJoinBrand] = useState("");
+  const [joinRole, setJoinRole] = useState<string>("CEO");
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState("");
+
+  const isAlreadyPlayer = game.teams.some((t) =>
+    t.members.some((m) => m.userId === myUserId)
+  );
+
+  async function handleJoinAsPlayer() {
+    setJoinError("");
+    setJoining(true);
+    try {
+      const res = await fetch(`/api/games/${game.id}/host-join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandName: joinBrand, role: joinRole }),
+      });
+      const body = await parseJSON(res);
+      if (!res.ok) { setJoinError(body.error as string ?? `HTTP ${res.status}`); return; }
+      setJoinBrand("");
+      await refreshGame();
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setJoining(false);
+    }
+  }
 
   async function handleKick(teamId: string) {
     setKicking(teamId);
@@ -103,16 +137,13 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
     setStarting(true);
     try {
       const res = await fetch(`/api/games/${game.id}/start`, { method: "POST" });
-      const body = await res.json();
-      if (!res.ok) {
-        setStartError(body.error ?? "START FAILED");
-        return;
-      }
-      setStartResult(body);
+      const body = await parseJSON(res);
+      if (!res.ok) { setStartError(body.error as string ?? `HTTP ${res.status}`); return; }
+      setStartResult(body as typeof startResult);
       setGame((prev) => ({ ...prev, status: "ACTIVE" }));
       await refreshGame();
-    } catch {
-      setStartError("CONNECTION ERROR");
+    } catch (err) {
+      setStartError(err instanceof Error ? err.message : "Network error");
     } finally {
       setStarting(false);
     }
@@ -124,18 +155,15 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
     const roundBeingResolved = game.currentRound;
     try {
       const res = await fetch(`/api/games/${game.id}/resolve`, { method: "POST" });
-      const body = await res.json();
-      if (!res.ok) {
-        setResolveError(body.error ?? "RESOLVE FAILED");
-        return;
-      }
+      const body = await parseJSON(res);
+      if (!res.ok) { setResolveError(body.error as string ?? `HTTP ${res.status}`); return; }
       setJustResolved(roundBeingResolved);
       await refreshGame();
       if (body.gameComplete) {
-        router.push(`/results/${game.id}/${roundBeingResolved}`);
+        router.push(`/results/${game.id}/final`);
       }
     } catch (err) {
-      setResolveError("CONNECTION ERROR: " + String(err));
+      setResolveError(err instanceof Error ? err.message : "Network error");
     } finally {
       setResolving(false);
     }
@@ -165,13 +193,16 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
       />
 
       <div className="max-w-4xl mx-auto px-4 py-8 relative" style={{ zIndex: 1 }}>
-        {/* Back */}
-        <Link
-          href="/facilitator"
-          style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#4a4a6a", textDecoration: "none" }}
-        >
-          ← COMMAND CENTER
-        </Link>
+        {/* Back + Sign out */}
+        <div className="flex items-center justify-between">
+          <Link
+            href="/facilitator"
+            style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#8888aa", textDecoration: "none" }}
+          >
+            ← COMMAND CENTER
+          </Link>
+          <SignOutButton className="pixel-btn" style={{ fontSize: "0.4rem", background: "transparent", color: "#8888aa", border: "2px solid #8888aa", boxShadow: "none" }} />
+        </div>
 
         {/* Header */}
         <div className="flex items-start justify-between mt-4 mb-6">
@@ -195,6 +226,12 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
                 style={{ fontSize: "0.45rem" }}
               >
                 {game.status}
+              </span>
+              <span
+                className="pixel-badge"
+                style={{ fontSize: "0.45rem", borderColor: game.mode === "PARTY" ? "#ff006e" : "#c77dff", color: game.mode === "PARTY" ? "#ff006e" : "#c77dff" }}
+              >
+                {game.mode === "PARTY" ? "🎉 PARTY" : "🏫 CLASSROOM"}
               </span>
             </div>
             <p style={{ fontSize: "1rem", color: "#888899", marginTop: "0.5rem" }}>
@@ -230,6 +267,57 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
 
         <hr className="pixel-hr" />
 
+        {/* Classroom: facilitator join as player (lobby only, if not yet a member) */}
+        {game.status === "LOBBY" && game.mode === "CLASSROOM" && !isAlreadyPlayer && (
+          <div className="pixel-card mb-6" style={{ borderColor: "#ff006e", boxShadow: "4px 4px 0 #4a0020" }}>
+            <p style={{ fontFamily: pxFont, fontSize: "0.55rem", color: "#ff006e", marginBottom: "0.25rem" }}>
+              ⚡ JOIN AS A PLAYER
+            </p>
+            <p style={{ fontFamily: bodyFont, fontSize: "0.9rem", color: "#888899", marginBottom: "1rem" }}>
+              Optional — create your own team and play alongside students.
+            </p>
+            {joinError && (
+              <div className="mb-3" style={{ border: "2px solid #ff006e", background: "#1a000d", padding: "0.5rem", fontFamily: pxFont, fontSize: "0.45rem", color: "#ff006e" }}>
+                ❌ {joinError}
+              </div>
+            )}
+            <div className="mb-4">
+              <label className="pixel-label mb-1 block">Your brand name</label>
+              <input
+                type="text"
+                value={joinBrand}
+                onChange={(e) => setJoinBrand(e.target.value)}
+                placeholder="e.g. SKYFORGE"
+                maxLength={30}
+                className="pixel-input w-full"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="pixel-label mb-2 block">Your role</label>
+              <div className="flex flex-wrap gap-2">
+                {ALL_ROLES.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setJoinRole(r)}
+                    style={{ border: "2px solid", borderColor: joinRole === r ? "#ff006e" : "#8888aa", background: joinRole === r ? "#ff006e22" : "#0a0a1a", padding: "0.4rem 0.75rem", cursor: "pointer", fontFamily: pxFont, fontSize: "0.42rem", color: joinRole === r ? "#ff006e" : "#888899" }}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={handleJoinAsPlayer}
+              disabled={joining || joinBrand.trim().length < 2}
+              className="pixel-btn pixel-btn-pink"
+              style={{ fontSize: "0.5rem" }}
+            >
+              {joining ? "JOINING..." : "⚡ JOIN & PLAY"}
+            </button>
+          </div>
+        )}
+
         {/* Start result — world event + briefing */}
         {startResult && (
           <div className="pixel-transmission pixel-slide-in mb-6">
@@ -243,10 +331,10 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
               {startResult.worldEvent.description}
             </p>
             <div style={{ borderTop: "2px solid #39ff14", paddingTop: "0.75rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", fontSize: "1rem" }}>
-              <div><span style={{ color: "#888899" }}>TOTAL DEMAND:</span>{" "}<span style={{ color: "#ffbe0b" }}>{startResult.briefing.totalFlyingCarDemand.toLocaleString()}</span></div>
-              <div><span style={{ color: "#888899" }}>ECONOMY:</span>{" "}<span style={{ color: "#39ff14", textTransform: "uppercase" }}>{startResult.briefing.economicCondition}</span></div>
-              <div><span style={{ color: "#888899" }}>PUBLIC PERCEPTION:</span>{" "}<span style={{ color: "#00f5ff" }}>{startResult.briefing.publicPerception}%</span></div>
-              <div><span style={{ color: "#888899" }}>POLICY SCORE:</span>{" "}<span style={{ color: "#ff006e" }}>{startResult.briefing.policyScore}</span></div>
+              <div><span style={{ color: "#888899" }}>Total demand:</span>{" "}<span style={{ color: "#ffbe0b" }}>{startResult.briefing.totalFlyingCarDemand.toLocaleString()}</span></div>
+              <div><span style={{ color: "#888899" }}>Economy:</span>{" "}<span style={{ color: "#39ff14", textTransform: "uppercase" }}>{startResult.briefing.economicCondition}</span></div>
+              <div><span style={{ color: "#888899" }}>Public perception:</span>{" "}<span style={{ color: "#00f5ff" }}>{startResult.briefing.publicPerception}%</span></div>
+              <div><span style={{ color: "#888899" }}>Policy score:</span>{" "}<span style={{ color: "#ff006e" }}>{startResult.briefing.policyScore}</span></div>
             </div>
           </div>
         )}
@@ -291,8 +379,8 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
                   </span>
                 </div>
 
-                {/* Party Mode: play link */}
-                {game.mode === "PARTY" && (
+                {/* Play link — shown when facilitator is also a player */}
+                {isAlreadyPlayer && (
                   <div>
                     <a
                       href={`/play/${game.id}`}
@@ -362,7 +450,7 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
             {/* Past rounds */}
             {game.rounds.filter((r) => r.status === "RESOLVED").length > 0 && (
               <div>
-                <p style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#4a4a6a", marginBottom: "0.5rem" }}>
+                <p style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#8888aa", marginBottom: "0.5rem" }}>
                   PAST ROUNDS
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -390,6 +478,13 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
             <p className="pixel-heading" style={{ fontSize: "0.8rem", color: "var(--px-green)", marginBottom: "1rem" }}>
               ★ GAME COMPLETE ★
             </p>
+            <Link
+              href={`/results/${game.id}/final`}
+              className="pixel-btn pixel-btn-amber inline-block mb-4"
+              style={{ fontSize: "0.55rem", textDecoration: "none", padding: "0.75rem 1.25rem" }}
+            >
+              🏆 FINAL STANDINGS →
+            </Link>
             <div className="flex flex-wrap gap-3 justify-center">
               {game.rounds
                 .filter((r) => r.status === "RESOLVED")
@@ -409,20 +504,20 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
 
         {/* Teams roster */}
         <div className="mt-6">
-          <p className="pixel-heading mb-4" style={{ fontSize: "0.5rem", color: "#4a4a6a" }}>
+          <p className="pixel-heading mb-4" style={{ fontSize: "0.5rem", color: "#8888aa" }}>
             TEAM ROSTER ({game.teams.length} TEAM{game.teams.length !== 1 ? "S" : ""})
           </p>
 
           {game.teams.length === 0 ? (
-            <div className="pixel-card text-center py-10" style={{ borderColor: "#4a4a6a" }}>
-              <p className="pixel-heading" style={{ fontSize: "0.5rem", color: "#4a4a6a" }}>
+            <div className="pixel-card text-center py-10" style={{ borderColor: "#8888aa" }}>
+              <p className="pixel-heading" style={{ fontSize: "0.5rem", color: "#8888aa" }}>
                 WAITING FOR PLAYERS...
               </p>
-              <p style={{ color: "#4a4a6a", fontSize: "1rem", marginTop: "0.75rem" }}>
+              <p style={{ color: "#8888aa", fontSize: "1rem", marginTop: "0.75rem" }}>
                 Share the code <span style={{ color: "#ffbe0b" }}>{game.code}</span> to get started.
               </p>
               {game.status === "LOBBY" && (
-                <span className="blink" style={{ display: "inline-block", marginTop: "1rem", fontFamily: pxFont, fontSize: "0.4rem", color: "#4a4a6a" }}>
+                <span className="blink" style={{ display: "inline-block", marginTop: "1rem", fontFamily: pxFont, fontSize: "0.4rem", color: "#8888aa" }}>
                   ■ POLLING FOR PLAYERS...
                 </span>
               )}
@@ -454,7 +549,7 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
                             ${(parseFloat(team.cash) / 1_000_000).toFixed(1)}M
                           </span>
                         )}
-                        <span style={{ fontSize: "0.9rem", color: "#4a4a6a" }}>
+                        <span style={{ fontSize: "0.9rem", color: "#8888aa" }}>
                           {team.members.length}/5 MEMBERS
                         </span>
                         {game.status === "LOBBY" && (
@@ -482,8 +577,8 @@ export function FacilitatorLobbyClient({ game: initialGame }: Props) {
         </div>
 
         {/* Role legend */}
-        <div className="mt-8 pixel-card" style={{ borderColor: "#4a4a6a", boxShadow: "none" }}>
-          <p className="pixel-label mb-3">ROLE COLOR LEGEND</p>
+        <div className="mt-8 pixel-card" style={{ borderColor: "#8888aa", boxShadow: "none" }}>
+          <p className="pixel-label mb-3">Role color legend</p>
           <div className="flex flex-wrap gap-3">
             {Object.entries(ROLE_COLORS).map(([role, color]) => (
               <span

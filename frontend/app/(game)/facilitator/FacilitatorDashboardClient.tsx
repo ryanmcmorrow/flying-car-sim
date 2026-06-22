@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ALL_ROLES } from "@/lib/game-utils";
+import { SignOutButton } from "@/components/game/SignOutButton";
+import { parseJSON } from "@/lib/api";
 
 interface GameSummary {
   id: string;
@@ -49,7 +51,7 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
   const [newCode, setNewCode] = useState<string | null>(null);
   const [newGameId, setNewGameId] = useState<string | null>(null);
 
-  // Step 2: host-join (PARTY only)
+  // Step 2: host-join (optional)
   const [brandName, setBrandName] = useState("");
   const [hostRole, setHostRole] = useState("CEO");
   const [joining, setJoining] = useState(false);
@@ -66,14 +68,14 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ economicCondition, mode, roundDurationSeconds: mode === "PARTY" && timerEnabled ? 480 : undefined }),
       });
-      const body = await res.json();
-      if (!res.ok) { setCreateError(body.error ?? "CREATE FAILED"); return; }
-      setNewCode(body.code);
-      setNewGameId(body.id);
-      setGameList((prev) => [{ id: body.id, code: body.code, status: "LOBBY", currentRound: 1, teamCount: 0, createdAt: new Date().toISOString() }, ...prev]);
-      setStep(mode === "PARTY" ? "host-join" : "done");
-    } catch {
-      setCreateError("CONNECTION ERROR");
+      const body = await parseJSON(res);
+      if (!res.ok) { setCreateError(body.error as string ?? `HTTP ${res.status}`); return; }
+      setNewCode(body.code as string);
+      setNewGameId(body.id as string);
+      setGameList((prev) => [{ id: body.id as string, code: body.code as string, status: "LOBBY", currentRound: 1, teamCount: 0, createdAt: new Date().toISOString() }, ...prev]);
+      setStep("host-join");
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Network error");
     } finally {
       setCreating(false);
     }
@@ -87,13 +89,13 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
       const res = await fetch(`/api/games/${newGameId}/host-join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandName, role: hostRole }),
+        body: JSON.stringify({ brandName, role: mode === "PARTY" ? "CEO" : hostRole }),
       });
-      const body = await res.json();
-      if (!res.ok) { setJoinError(body.error ?? "JOIN FAILED"); return; }
+      const body = await parseJSON(res);
+      if (!res.ok) { setJoinError(body.error as string ?? `HTTP ${res.status}`); return; }
       router.push(`/lobby/${newGameId}`);
-    } catch {
-      setJoinError("CONNECTION ERROR");
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : "Network error");
     } finally {
       setJoining(false);
     }
@@ -119,29 +121,32 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
       <div className="max-w-4xl mx-auto px-4 py-8 relative" style={{ zIndex: 1 }}>
         <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="pixel-heading" style={{ fontSize: "0.9rem", lineHeight: 1.8 }}>COMMAND CENTER</h1>
+            <h1 className="pixel-heading" style={{ fontSize: "0.9rem", lineHeight: 1.8 }}>Command Center</h1>
             <p style={{ fontSize: "1.1rem", color: "#888899", marginTop: "0.5rem" }}>
               Welcome back, <span style={{ color: "#ffbe0b" }}>{facilitatorName}</span>
             </p>
           </div>
-          <button onClick={() => setShowModal(true)} className="pixel-btn pixel-btn-pink" style={{ fontSize: "0.55rem" }}>
-            + CREATE GAME
-          </button>
+          <div className="flex items-center gap-3">
+            <SignOutButton className="pixel-btn" style={{ fontSize: "0.45rem", background: "transparent", color: "#8888aa", border: "2px solid #8888aa", boxShadow: "none" }} />
+            <button onClick={() => setShowModal(true)} className="pixel-btn pixel-btn-pink" style={{ fontSize: "0.55rem" }}>
+              + CREATE GAME
+            </button>
+          </div>
         </div>
 
         <hr className="pixel-hr" />
 
         {gameList.length === 0 ? (
           <div className="pixel-card text-center py-12" style={{ marginTop: "2rem" }}>
-            <p className="pixel-heading" style={{ fontSize: "0.6rem", color: "#4a4a6a" }}>NO GAMES YET</p>
-            <p style={{ color: "#4a4a6a", fontSize: "1.1rem", marginTop: "1rem" }}>Hit CREATE GAME to launch your first simulation.</p>
+            <p className="pixel-heading" style={{ fontSize: "0.6rem", color: "#8888aa" }}>No games yet</p>
+            <p style={{ color: "#8888aa", fontSize: "1.1rem", marginTop: "1rem" }}>Hit CREATE GAME to launch your first simulation.</p>
           </div>
         ) : (
           <div className="space-y-4 mt-6">
-            <p className="pixel-heading" style={{ fontSize: "0.5rem", color: "#4a4a6a" }}>YOUR GAMES ({gameList.length})</p>
+            <p className="pixel-heading" style={{ fontSize: "0.5rem", color: "#8888aa" }}>Your games ({gameList.length})</p>
             {gameList.map((game) => (
               <Link key={game.id} href={`/facilitator/${game.id}`} style={{ display: "block" }}>
-                <div className="pixel-card" style={{ cursor: "pointer", transition: "none", borderColor: game.status === "ACTIVE" ? "#39ff14" : game.status === "COMPLETED" ? "#4a4a6a" : "#00f5ff" }}>
+                <div className="pixel-card" style={{ cursor: "pointer", transition: "none", borderColor: game.status === "ACTIVE" ? "#39ff14" : game.status === "COMPLETED" ? "#8888aa" : "#00f5ff" }}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <span className="pixel-heading" style={{ fontSize: "1rem", letterSpacing: "0.3em" }}>{game.code}</span>
@@ -150,7 +155,7 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
                     <div className="flex items-center gap-6" style={{ fontSize: "0.95rem", color: "#888899" }}>
                       <span><span style={{ color: "#ffbe0b" }}>{game.teamCount}</span> TEAMS</span>
                       <span>RND <span style={{ color: "#00f5ff" }}>{game.currentRound}</span></span>
-                      <span style={{ color: "#4a4a6a", fontSize: "0.85rem" }}>→</span>
+                      <span style={{ color: "#8888aa", fontSize: "0.85rem" }}>→</span>
                     </div>
                   </div>
                 </div>
@@ -178,15 +183,15 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
 
                 {/* Mode selector */}
                 <div className="mb-5">
-                  <label className="pixel-label mb-2 block">GAME MODE</label>
+                  <label className="pixel-label mb-2 block">Game mode</label>
                   <div className="flex gap-3">
                     {(["CLASSROOM", "PARTY"] as const).map((m) => (
                       <button key={m} type="button" onClick={() => setMode(m)} className="flex-1 p-3 text-left"
-                        style={{ border: "2px solid", borderColor: mode === m ? "#ff006e" : "#4a4a6a", background: mode === m ? "#ff006e22" : "#0a0a1a", cursor: "pointer" }}>
+                        style={{ border: "2px solid", borderColor: mode === m ? "#ff006e" : "#8888aa", background: mode === m ? "#ff006e22" : "#0a0a1a", cursor: "pointer" }}>
                         <div style={{ fontFamily: px, fontSize: "0.45rem", color: mode === m ? "#ff006e" : "#888899", marginBottom: "0.3rem" }}>
                           {m === "CLASSROOM" ? "🏫 CLASSROOM" : "🎉 PARTY"}
                         </div>
-                        <div style={{ fontFamily: body, fontSize: "0.9rem", color: mode === m ? "#cccccc" : "#666677" }}>
+                        <div style={{ fontFamily: body, fontSize: "0.9rem", color: mode === m ? "#cccccc" : "#9999bb" }}>
                           {m === "CLASSROOM" ? "You control the pace. Start each round manually." : "Self-run! 8-min timer, auto-resolves. You play too."}
                         </div>
                       </button>
@@ -198,11 +203,11 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
                 {mode === "PARTY" && (
                   <div className="mb-5">
                     <button type="button" onClick={() => setTimerEnabled((v) => !v)} className="w-full text-left p-3"
-                      style={{ border: "2px solid", borderColor: timerEnabled ? "#ffbe0b" : "#4a4a6a", background: timerEnabled ? "#ffbe0b22" : "#0a0a1a", cursor: "pointer" }}>
+                      style={{ border: "2px solid", borderColor: timerEnabled ? "#ffbe0b" : "#8888aa", background: timerEnabled ? "#ffbe0b22" : "#0a0a1a", cursor: "pointer" }}>
                       <div style={{ fontFamily: px, fontSize: "0.45rem", color: timerEnabled ? "#ffbe0b" : "#888899", marginBottom: "0.3rem" }}>
                         ⏱ {timerEnabled ? "TIMER: ON (8 min/round)" : "TIMER: OFF (no time limit)"}
                       </div>
-                      <div style={{ fontFamily: body, fontSize: "0.9rem", color: timerEnabled ? "#cccccc" : "#666677" }}>
+                      <div style={{ fontFamily: body, fontSize: "0.9rem", color: timerEnabled ? "#cccccc" : "#9999bb" }}>
                         {timerEnabled ? "Rounds auto-resolve after 8 minutes." : "Rounds only resolve when you press the button. Good for playtesting."}
                       </div>
                     </button>
@@ -211,20 +216,20 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
 
                 {/* Econ condition */}
                 <div className="space-y-2 mb-6">
-                  <label className="pixel-label">ECONOMIC CONDITION</label>
+                  <label className="pixel-label">Economic condition</label>
                   {ECON_OPTIONS.map((opt) => (
                     <button key={opt.value} type="button" onClick={() => setEconomicCondition(opt.value as "stable" | "growth" | "recession")} className="w-full text-left p-3"
-                      style={{ border: "2px solid", borderColor: economicCondition === opt.value ? "#00f5ff" : "#4a4a6a", background: economicCondition === opt.value ? "#00f5ff22" : "#0a0a1a", cursor: "pointer" }}>
+                      style={{ border: "2px solid", borderColor: economicCondition === opt.value ? "#00f5ff" : "#8888aa", background: economicCondition === opt.value ? "#00f5ff22" : "#0a0a1a", cursor: "pointer" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                         <span style={{ fontFamily: px, fontSize: "0.5rem", color: economicCondition === opt.value ? "#00f5ff" : "#888899" }}>{opt.label}</span>
-                        <span style={{ fontFamily: body, fontSize: "1rem", color: economicCondition === opt.value ? "#cccccc" : "#666677" }}>{opt.desc}</span>
+                        <span style={{ fontFamily: body, fontSize: "1rem", color: economicCondition === opt.value ? "#cccccc" : "#9999bb" }}>{opt.desc}</span>
                       </div>
                     </button>
                   ))}
                 </div>
 
                 <div className="flex gap-3">
-                  <button onClick={handleClose} className="pixel-btn pixel-btn-amber" style={{ fontSize: "0.5rem" }}>CANCEL</button>
+                  <button onClick={handleClose} className="pixel-btn pixel-btn-amber" style={{ fontSize: "0.5rem" }}>Cancel</button>
                   <button onClick={handleCreate} disabled={creating} className="pixel-btn pixel-btn-green" style={{ fontSize: "0.5rem", flex: 1 }}>
                     {creating ? "LAUNCHING..." : "▶ LAUNCH GAME"}
                   </button>
@@ -236,40 +241,51 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
             {step === "host-join" && (
               <>
                 <p className="pixel-heading mb-2 text-center" style={{ fontSize: "0.55rem", color: "#39ff14" }}>✓ GAME CREATED: <span style={{ color: "#ffbe0b" }}>{newCode}</span></p>
-                <p className="pixel-heading mb-5 text-center" style={{ fontSize: "0.6rem" }}>NOW: JOIN AS HOST PLAYER</p>
+                <p className="pixel-heading mb-1 text-center" style={{ fontSize: "0.6rem" }}>
+                  {mode === "PARTY" ? "PLAY AS A SOLO FOUNDER?" : "JOIN AS A PLAYER?"}
+                </p>
+                <p style={{ fontFamily: body, fontSize: "0.9rem", color: "#8888aa", textAlign: "center", marginBottom: "1.5rem" }}>
+                  Optional — skip if you just want to facilitate.
+                </p>
 
                 {joinError && (
                   <div className="mb-4 p-3" style={{ border: "2px solid #ff006e", background: "#1a000d", fontFamily: px, fontSize: "0.5rem", color: "#ff006e" }}>❌ {joinError}</div>
                 )}
 
                 <div className="mb-4">
-                  <label className="pixel-label mb-1 block">YOUR BRAND NAME</label>
+                  <label className="pixel-label mb-1 block">Your brand name</label>
                   <input
                     type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)}
                     placeholder="e.g. SKYFORGE" maxLength={30}
                     className="pixel-input w-full"
-                    style={{ fontFamily: px, fontSize: "0.5rem" }}
                   />
                 </div>
 
-                <div className="mb-6">
-                  <label className="pixel-label mb-2 block">YOUR ROLE</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {ALL_ROLES.map((r) => (
-                      <button key={r} type="button" onClick={() => setHostRole(r)}
-                        style={{ border: "2px solid", borderColor: hostRole === r ? "#ff006e" : "#4a4a6a", background: hostRole === r ? "#ff006e22" : "#0a0a1a", padding: "0.5rem", cursor: "pointer", fontFamily: px, fontSize: "0.42rem", color: hostRole === r ? "#ff006e" : "#888899" }}>
-                        {r}
-                      </button>
-                    ))}
+                {mode === "CLASSROOM" && (
+                  <div className="mb-6">
+                    <label className="pixel-label mb-2 block">Your role</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {ALL_ROLES.map((r) => (
+                        <button key={r} type="button" onClick={() => setHostRole(r)}
+                          style={{ border: "2px solid", borderColor: hostRole === r ? "#ff006e" : "#8888aa", background: hostRole === r ? "#ff006e22" : "#0a0a1a", padding: "0.5rem", cursor: "pointer", fontFamily: px, fontSize: "0.42rem", color: hostRole === r ? "#ff006e" : "#888899" }}>
+                          {r}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="flex gap-3">
-                  <button onClick={handleClose} className="pixel-btn pixel-btn-amber" style={{ fontSize: "0.5rem" }}>CANCEL</button>
+                <div className="flex gap-3 flex-col">
                   <button onClick={handleHostJoin} disabled={joining || brandName.trim().length < 2}
-                    className="pixel-btn pixel-btn-pink" style={{ fontSize: "0.5rem", flex: 1 }}>
-                    {joining ? "JOINING..." : "▶ JOIN & GO TO LOBBY"}
+                    className="pixel-btn pixel-btn-pink w-full" style={{ fontSize: "0.5rem" }}>
+                    {joining ? "JOINING..." : "⚡ JOIN & GO TO LOBBY"}
                   </button>
+                  {newGameId && (
+                    <Link href={`/facilitator/${newGameId}`} className="pixel-btn pixel-btn-amber text-center w-full" style={{ fontSize: "0.5rem", textDecoration: "none" }}>
+                      SKIP — JUST FACILITATE
+                    </Link>
+                  )}
+                  <button onClick={handleClose} className="pixel-btn w-full" style={{ fontSize: "0.5rem", background: "transparent", color: "#8888aa", border: "2px solid #8888aa", boxShadow: "none" }}>Cancel</button>
                 </div>
               </>
             )}
@@ -286,7 +302,7 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
                   COPY CODE TO CLIPBOARD
                 </button>
                 <div className="flex gap-3">
-                  <button onClick={handleClose} className="pixel-btn pixel-btn-amber" style={{ fontSize: "0.5rem" }}>CLOSE</button>
+                  <button onClick={handleClose} className="pixel-btn pixel-btn-amber" style={{ fontSize: "0.5rem" }}>Close</button>
                   {newGameId && (
                     <Link href={`/facilitator/${newGameId}`} className="pixel-btn pixel-btn-green text-center" style={{ fontSize: "0.5rem", flex: 1, textDecoration: "none" }}>
                       ▶ GO TO LOBBY

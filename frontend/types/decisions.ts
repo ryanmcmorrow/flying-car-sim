@@ -31,16 +31,30 @@ export interface RdSection {
     competitorResearch: boolean; // $2M
     marketResearch: boolean; // $1.5M
   };
+  /** Targeted focus for recurring subscriptions (which competitor/segment/region to analyze) */
+  recurringTargets: {
+    competitorResearch?: string; // teamId of rival to track
+    pricingResearch?: string;    // vehicle type to price-analyze: COMPACT | SEDAN | SUV | SPORTS_CAR | TRUCK
+    marketResearch?: string;     // region to focus: WEST_COAST | NORTHEAST | etc.
+  };
   techTreeUnlocks: string[];
+  /** One-time market intel purchases: e.g. "intel_region_WEST_COAST", "intel_type_COMPACT" */
+  intelPurchases: string[];
 }
 
 export type SpaceSize = "small" | "medium" | "large";
 export type SpaceOwnership = "rent" | "buy";
+export type FacilityRegion = "WEST_COAST" | "NORTHEAST" | "SOUTHEAST" | "MIDWEST" | "SOUTHWEST";
+
+export interface Facility {
+  region: FacilityRegion;
+  size: SpaceSize;
+  ownership: SpaceOwnership;
+}
 
 export interface ManufacturingSection {
-  spaceAction: "keep" | "new" | "upgrade" | "sell";
-  spaceSize?: SpaceSize;
-  spaceOwnership?: SpaceOwnership;
+  /** New facilities being added this round (rent = this year only; buy = permanent) */
+  newFacilities: Facility[];
   productionRuns: Array<{
     modelId: string;
     units: number;
@@ -64,7 +78,7 @@ export interface ProductionSection {
 
 export interface MarketingSection {
   totalBudget: number;
-  messagingType: "category" | "brand";
+  categorySplit: number; // 0–100: % of totalBudget going to category (market growth); remainder is brand
   tone: "positive" | "attack";
   attackTargetTeamId?: string;
   channels: {

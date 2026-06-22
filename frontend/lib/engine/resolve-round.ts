@@ -9,6 +9,7 @@ import {
   YEAR1_DEMAND_BY_TYPE_BY_REGION,
   BRAND_PERCEPTION_PARAMS,
   PRICE_ELASTICITY,
+  VEHICLE_PRICE_RANGE,
   MARKETING_CHANNEL_EFFECTIVENESS,
   PARTS_BASE_RELIABILITY,
   ENGINE_RELIABILITY_MOD,
@@ -21,6 +22,8 @@ import { getPolicyDemandFactor, computeThisRoundDemand, computeNextRoundDemand }
 import { computeSupplyChainScarcity, computeSegmentCrowding, computeRegionalGlutDiscounts, computeTalentWarPenalty } from "./scarcity";
 import { computeReliabilityScore, getRecallTier, computeBrandPerceptionDelta, computeNewPublicPerception } from "./perception";
 import { computeTeamRdSpend, computeEffectiveUnitCost, computeQualityScore, computeSpaceCost, computeRepairRevenue, computeFleetRepairRate, computeInventoryCarryingCost, computeEngineeringFeesForTeam } from "./financials";
+import type { FacilitiesCostResult } from "./financials";
+import { SHIPPING_COST_PER_UNIT } from "./constants";
 import { computePolicyScoreUpdate } from "./lobbying";
 import { TECH_TREE_DEF } from "@/lib/decision-utils";
 
@@ -80,6 +83,85 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     roundNumber
   );
 
+  // ── Step 4.5: Priced-out buyers spill to cheaper alternatives ───────────────
+  // Each segment has a budget floor (VEHICLE_PRICE_RANGE.low). When the cheapest
+  // car available in a segment is above that floor, buyers who can't afford it
+  // go looking in other segments for something within their budget. The further
+  // above the floor the cheapest option sits, the more buyers spill out (capped
+  // at 40% of the segment).
+  {
+    // Cheapest sale price offered per type × region (only models actually allocated there)
+    const cheapestByTypeByRegion: Partial<Record<VehicleType, Partial<Record<Region, number>>>> = {};
+    for (const team of teams) {
+      for (const model of team.vehicleSection.models) {
+        const prodModel = team.productionSection.models.find((m) => m.modelId === model.id);
+        if (!prodModel?.salePrice) continue;
+        for (const region of REGIONS) {
+          const alloc = prodModel.regionalAllocation[region as keyof typeof prodModel.regionalAllocation] ?? 0;
+          if (alloc <= 0) continue;
+          const vt = model.vehicleType;
+          if (!cheapestByTypeByRegion[vt]) cheapestByTypeByRegion[vt] = {};
+          const prev = cheapestByTypeByRegion[vt]![region];
+          cheapestByTypeByRegion[vt]![region] = prev === undefined ? prodModel.salePrice : Math.min(prev, prodModel.salePrice);
+        }
+      }
+    }
+
+    const deltas: Partial<Record<VehicleType, Partial<Record<Region, number>>>> = {};
+
+    for (const sourceVt of VEHICLE_TYPES) {
+      const budgetFloor = VEHICLE_PRICE_RANGE[sourceVt].low;
+
+      for (const region of REGIONS) {
+        const baseDemand = demandByTypeByRegion[sourceVt]?.[region] ?? 0;
+        if (baseDemand === 0) continue;
+
+        const cheapest = cheapestByTypeByRegion[sourceVt]?.[region];
+        if (cheapest === undefined || cheapest <= budgetFloor) continue;
+
+        // Fraction of buyers priced out: scales linearly from 0 (at budgetFloor)
+        // to 40% (when cheapest is 2× the budgetFloor). Capped at 40%.
+        const priceGap = cheapest - budgetFloor;
+        const pricedOutFraction = Math.min(0.40, priceGap / budgetFloor);
+        const spilloverBuyers = Math.round(baseDemand * pricedOutFraction);
+        if (spilloverBuyers === 0) continue;
+
+        // Find other segments where something exists priced ≤ cheapest (affordable for spilled buyers)
+        const alternatives: VehicleType[] = [];
+        for (const destVt of VEHICLE_TYPES) {
+          if (destVt === sourceVt) continue;
+          const destCheapest = cheapestByTypeByRegion[destVt]?.[region];
+          if (destCheapest !== undefined && destCheapest <= cheapest) {
+            alternatives.push(destVt);
+          }
+        }
+        if (alternatives.length === 0) continue;
+
+        if (!deltas[sourceVt]) deltas[sourceVt] = {};
+        deltas[sourceVt]![region] = (deltas[sourceVt]![region] ?? 0) - spilloverBuyers;
+
+        const perAlt = Math.round(spilloverBuyers / alternatives.length);
+        for (const destVt of alternatives) {
+          if (!deltas[destVt]) deltas[destVt] = {};
+          deltas[destVt]![region] = (deltas[destVt]![region] ?? 0) + perAlt;
+        }
+      }
+    }
+
+    // Apply deltas
+    for (const vt of VEHICLE_TYPES) {
+      const vtDeltas = deltas[vt];
+      if (!vtDeltas) continue;
+      for (const region of REGIONS) {
+        if (!demandByTypeByRegion[vt]) continue;
+        demandByTypeByRegion[vt][region] = Math.max(
+          0,
+          (demandByTypeByRegion[vt][region] ?? 0) + (vtDeltas[region] ?? 0)
+        );
+      }
+    }
+  }
+
   // ── Step 5: Industry-level aggregates for scarcity ────────────────────────
   const scarcityResult = computeSupplyChainScarcity(teams);
   const crowdingResult = computeSegmentCrowding(teams);
@@ -111,7 +193,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     reliabilityByModelId: Record<string, number>;
     qualityScoreByModelId: Record<string, number>;
     engineeringFees: number;
-    spaceCostResult: ReturnType<typeof computeSpaceCost>;
+    spaceCostResult: FacilitiesCostResult;
   }
 
   const teamCalcs: Record<string, TeamCalcs> = {};
@@ -167,11 +249,10 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
   for (const team of teams) {
     const mkt = team.marketingSection;
     const totalBudget = mkt.totalBudget ?? 0;
-    const isCategory = mkt.messagingType === "category";
     const isAttack = mkt.tone === "attack";
-
-    const categorySpend = isCategory ? totalBudget : 0;
-    const brandSpend = !isCategory ? totalBudget : 0;
+    const categorySplit = Math.min(100, Math.max(0, mkt.categorySplit ?? 0));
+    const categorySpend = Math.round(totalBudget * categorySplit / 100);
+    const brandSpend = totalBudget - categorySpend;
 
     // Compute channel-weighted effectiveness per type
     const channelWeights = mkt.channels ?? {
@@ -247,17 +328,20 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
   }
 
   // ── Step 8: Market share per team × type × region ─────────────────────────
-  // unitsDemanded[teamId][modelId][region]
   const unitsDemandedByModelByRegion: Record<string, Record<string, Record<Region, number>>> = {};
   const effectivePriceByModelByRegion: Record<string, Record<string, Record<Region, number>>> = {};
+  // clearingPrice[teamId][modelId][region]
+  const clearingPriceByModelByRegion: Record<string, Record<string, Record<Region, number>>> = {};
 
-  // Glut discounts (Step 9 first pass — we need supply to compute this)
+  // Glut discounts (need supply totals first)
   const glutDiscounts = computeRegionalGlutDiscounts(teams, demandByTypeByRegion);
 
   for (const vt of VEHICLE_TYPES) {
+    const priceRange = VEHICLE_PRICE_RANGE[vt];
+
     for (const region of REGIONS) {
-      const demandHere = demandByTypeByRegion[vt]?.[region] ?? 0;
-      if (demandHere === 0) continue;
+      const baseDemandHere = demandByTypeByRegion[vt]?.[region] ?? 0;
+      if (baseDemandHere === 0) continue;
 
       // Find all teams competing in this type × region
       const competitors: Array<{
@@ -268,106 +352,101 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
         salePrice: number;
         qualityScore: number;
         marketingSpend: number;
+        regionAlloc: number;
       }> = [];
 
       for (const team of teams) {
         for (const model of team.vehicleSection.models) {
           if (model.vehicleType !== vt) continue;
-
-          const prodModel = team.productionSection.models.find(
-            (m) => m.modelId === model.id
-          );
-          const run = team.manufacturingSection.productionRuns.find(
-            (r) => r.modelId === model.id
-          );
-
+          const prodModel = team.productionSection.models.find((m) => m.modelId === model.id);
+          const run = team.manufacturingSection.productionRuns.find((r) => r.modelId === model.id);
           if (!prodModel || !run) continue;
-
-          const regionAlloc =
-            prodModel.regionalAllocation[region as keyof typeof prodModel.regionalAllocation] ?? 0;
+          const regionAlloc = prodModel.regionalAllocation[region as keyof typeof prodModel.regionalAllocation] ?? 0;
           if (regionAlloc <= 0) continue;
-
           competitors.push({
-            team,
-            model,
-            prodModel,
-            run,
+            team, model, prodModel, run,
             salePrice: prodModel.salePrice,
-            qualityScore:
-              teamCalcs[team.teamId]?.qualityScoreByModelId[model.id] ?? 1.0,
-            marketingSpend:
-              teamMarketingCalcs[team.teamId]?.brandSpendByTypeByRegion[vt][region] ?? 0,
+            qualityScore: teamCalcs[team.teamId]?.qualityScoreByModelId[model.id] ?? 1.0,
+            marketingSpend: teamMarketingCalcs[team.teamId]?.brandSpendByTypeByRegion[vt][region] ?? 0,
+            regionAlloc,
           });
         }
       }
 
       if (competitors.length === 0) continue;
 
-      // Average price
-      const avgPrice =
-        competitors.reduce((s, c) => s + c.salePrice, 0) / competitors.length;
+      // ── Absolute demand curve ─────────────────────────────────────────────
+      // Weighted average price by units allocated in this region
+      let totalWeightedPrice = 0, totalAllocUnits = 0;
+      for (const c of competitors) {
+        const units = Math.round(c.run.units * c.regionAlloc / 100);
+        totalWeightedPrice += c.salePrice * units;
+        totalAllocUnits += units;
+      }
+      const industryAvgPrice = totalAllocUnits > 0 ? totalWeightedPrice / totalAllocUnits : competitors[0].salePrice;
 
-      // Crowding factor
+      let absDemandMultiplier: number;
+      if (industryAvgPrice <= priceRange.low) {
+        // Below floor: small boost, capped at +15%
+        absDemandMultiplier = Math.min(1.15, 1.0 + 0.15 * (priceRange.low - industryAvgPrice) / priceRange.low);
+      } else if (industryAvgPrice <= priceRange.high) {
+        // Normal range: no adjustment
+        absDemandMultiplier = 1.0;
+      } else {
+        // Above ceiling: linear demand destruction, floor at 0.25×
+        const overshoot = (industryAvgPrice - priceRange.high) / priceRange.high;
+        absDemandMultiplier = Math.max(0.25, 1.0 - 0.75 * overshoot);
+      }
+
+      const demandHere = Math.round(baseDemandHere * absDemandMultiplier);
+
+      // ── Relative demand share ─────────────────────────────────────────────
+      const avgPrice = competitors.reduce((s, c) => s + c.salePrice, 0) / competitors.length;
       const crowdingFactor = crowdingResult.marketingFactor[vt];
       const priceForcedDown = crowdingResult.priceForcedDown[vt];
-
-      // Effective avg price after crowding
       const effectiveAvgPrice = avgPrice * (1 - priceForcedDown);
-
-      // Determine if any teams have brand spend
       const anyBrandSpend = competitors.some((c) => c.marketingSpend > 0);
 
-      // Compute demand score for each competitor
       const demandScores: number[] = [];
+      const baseScores: number[] = []; // score without priceFactor, for clearing price calc
 
       for (const c of competitors) {
         const brandPerception = teamBrandPerceptions[c.team.teamId] ?? 0;
         const { divisor, floor } = BRAND_PERCEPTION_PARAMS[vt];
         const brandMulti = Math.max(floor, 1.0 + brandPerception / divisor);
 
-        // Price factor
-        let priceFactor: number;
-        const effectiveSalePrice = c.salePrice * (1 - priceForcedDown);
-
-        if (vt === "SPORTS_CAR") {
-          // Prestige pricing
-          if (effectiveSalePrice > effectiveAvgPrice) {
-            const prestigeBonus = Math.min(
-              0.15,
-              0.375 * (effectiveSalePrice - effectiveAvgPrice) / effectiveAvgPrice
-            );
-            priceFactor = 1.0 + prestigeBonus;
-          } else {
-            const cheapnessPenalty =
-              0.5 * (effectiveAvgPrice - effectiveSalePrice) / effectiveAvgPrice;
-            priceFactor = 1.0 - cheapnessPenalty;
-          }
-        } else {
-          const elasticity = PRICE_ELASTICITY[vt];
-          priceFactor =
-            effectiveAvgPrice > 0
-              ? 1.0 +
-                elasticity *
-                  (effectiveAvgPrice - effectiveSalePrice) /
-                  effectiveAvgPrice
-              : 1.0;
-        }
-
-        priceFactor = Math.max(0.1, priceFactor);
-
-        // Marketing share raw
+        // Diminishing returns: sqrt curve so doubling spend ≠ doubling share.
+        // Each $1M = 1 unit of "effective spend"; sqrt(25M) = 5, sqrt(100M) = 10.
         let marketingShareRaw: number;
         if (!anyBrandSpend) {
           marketingShareRaw = 1.0;
         } else {
-          marketingShareRaw = c.marketingSpend > 0
-            ? c.marketingSpend * crowdingFactor
-            : 0.1 * crowdingFactor; // floor for zero-spend teams
+          const effectiveSpend = c.marketingSpend > 0
+            ? Math.sqrt(c.marketingSpend / 1_000_000)
+            : 0.1; // no-spend floor keeps you on the board at ~1/10 the minimum
+          marketingShareRaw = effectiveSpend * crowdingFactor;
         }
 
-        const demandScore =
-          brandMulti * priceFactor * c.qualityScore * marketingShareRaw;
-        demandScores.push(Math.max(0, demandScore));
+        const baseScore = brandMulti * c.qualityScore * marketingShareRaw;
+        baseScores.push(baseScore);
+
+        let priceFactor: number;
+        const effectiveSalePrice = c.salePrice * (1 - priceForcedDown);
+
+        if (vt === "SPORTS_CAR") {
+          if (effectiveSalePrice > effectiveAvgPrice) {
+            priceFactor = 1.0 + Math.min(0.15, 0.375 * (effectiveSalePrice - effectiveAvgPrice) / effectiveAvgPrice);
+          } else {
+            priceFactor = 1.0 - 0.5 * (effectiveAvgPrice - effectiveSalePrice) / effectiveAvgPrice;
+          }
+        } else {
+          const elasticity = PRICE_ELASTICITY[vt];
+          priceFactor = effectiveAvgPrice > 0
+            ? 1.0 + elasticity * (effectiveAvgPrice - effectiveSalePrice) / effectiveAvgPrice
+            : 1.0;
+        }
+
+        demandScores.push(Math.max(0, baseScore * Math.max(0.1, priceFactor)));
       }
 
       const totalDemandScore = demandScores.reduce((a, b) => a + b, 0);
@@ -377,25 +456,70 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
         const share = totalDemandScore > 0 ? demandScores[i] / totalDemandScore : 1 / competitors.length;
         const unitsDemanded = Math.round(share * demandHere);
 
-        if (!unitsDemandedByModelByRegion[c.team.teamId]) {
-          unitsDemandedByModelByRegion[c.team.teamId] = {};
-        }
-        if (!unitsDemandedByModelByRegion[c.team.teamId][c.model.id]) {
-          unitsDemandedByModelByRegion[c.team.teamId][c.model.id] = {} as Record<Region, number>;
-        }
+        if (!unitsDemandedByModelByRegion[c.team.teamId]) unitsDemandedByModelByRegion[c.team.teamId] = {};
+        if (!unitsDemandedByModelByRegion[c.team.teamId][c.model.id]) unitsDemandedByModelByRegion[c.team.teamId][c.model.id] = {} as Record<Region, number>;
         unitsDemandedByModelByRegion[c.team.teamId][c.model.id][region] = unitsDemanded;
 
-        // Effective price after glut discount
         const glutDiscount = glutDiscounts[vt]?.[region] ?? 0;
-        const effectivePrice = c.salePrice * (1 - glutDiscount) * (1 - crowdingResult.priceForcedDown[vt]);
-
-        if (!effectivePriceByModelByRegion[c.team.teamId]) {
-          effectivePriceByModelByRegion[c.team.teamId] = {};
-        }
-        if (!effectivePriceByModelByRegion[c.team.teamId][c.model.id]) {
-          effectivePriceByModelByRegion[c.team.teamId][c.model.id] = {} as Record<Region, number>;
-        }
+        const effectivePrice = c.salePrice * (1 - glutDiscount) * (1 - priceForcedDown);
+        if (!effectivePriceByModelByRegion[c.team.teamId]) effectivePriceByModelByRegion[c.team.teamId] = {};
+        if (!effectivePriceByModelByRegion[c.team.teamId][c.model.id]) effectivePriceByModelByRegion[c.team.teamId][c.model.id] = {} as Record<Region, number>;
         effectivePriceByModelByRegion[c.team.teamId][c.model.id][region] = Math.round(effectivePrice);
+
+        // ── Clearing price ────────────────────────────────────────────────
+        // Price at which share(P) × demandHere = unitsAllocated exactly.
+        const unitsAllocated = Math.round(c.run.units * c.regionAlloc / 100);
+        let clearingPrice = 0;
+
+        if (demandHere > 0 && unitsAllocated > 0) {
+          const sumOtherScores = totalDemandScore - demandScores[i];
+
+          if (sumOtherScores === 0) {
+            // Solo in this region — whole market is theirs regardless of price (within relative model).
+            // Absolute curve ceiling is the meaningful upper bound.
+            clearingPrice = unitsAllocated <= demandHere ? priceRange.high : 0;
+          } else if (unitsAllocated >= demandHere) {
+            // Need more than 100% share — not achievable. Signal: demand-limited.
+            clearingPrice = 0;
+          } else {
+            const targetShare = unitsAllocated / demandHere;
+            // targetScore such that targetScore / (targetScore + sumOther) = targetShare
+            const targetScore = targetShare * sumOtherScores / (1 - targetShare);
+            const myBase = baseScores[i];
+            const targetPriceFactor = myBase > 0 ? targetScore / myBase : 1.0;
+
+            if (vt === "SPORTS_CAR") {
+              // Binary search — prestige curve isn't analytically invertible
+              let lo = avgPrice * 0.3, hi = avgPrice * 4;
+              for (let iter = 0; iter < 24; iter++) {
+                const mid = (lo + hi) / 2;
+                let pf: number;
+                if (mid > avgPrice) {
+                  pf = 1.0 + Math.min(0.15, 0.375 * (mid - avgPrice) / avgPrice);
+                } else {
+                  pf = 1.0 - 0.5 * (avgPrice - mid) / avgPrice;
+                }
+                if (Math.max(0.1, pf) < targetPriceFactor) lo = mid; else hi = mid;
+              }
+              clearingPrice = Math.round((lo + hi) / 2);
+            } else {
+              const elasticity = PRICE_ELASTICITY[vt];
+              if (elasticity > 0) {
+                // priceFactor = 1 + e*(avgPrice - P)/avgPrice = targetPriceFactor
+                // P = avgPrice * (1 - (targetPriceFactor - 1) / e)
+                clearingPrice = Math.round(avgPrice * (1 - (targetPriceFactor - 1) / elasticity));
+              } else {
+                clearingPrice = c.salePrice; // elasticity=0, relative price irrelevant
+              }
+            }
+            // Clamp: clearing price shouldn't be negative or absurdly high
+            clearingPrice = Math.max(0, Math.min(clearingPrice, priceRange.high * 3));
+          }
+        }
+
+        if (!clearingPriceByModelByRegion[c.team.teamId]) clearingPriceByModelByRegion[c.team.teamId] = {};
+        if (!clearingPriceByModelByRegion[c.team.teamId][c.model.id]) clearingPriceByModelByRegion[c.team.teamId][c.model.id] = {} as Record<Region, number>;
+        clearingPriceByModelByRegion[c.team.teamId][c.model.id][region] = clearingPrice;
       }
     }
   }
@@ -412,6 +536,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
 
     let totalSalesRevenue = 0;
     let totalCogs = 0;
+    let totalShipping = 0;
     let totalUnitsSold = 0;
 
     const inventoryByType: Record<VehicleType, number> = {
@@ -441,6 +566,10 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       COMPACT: 0, SEDAN: 0, SUV: 0, TRUCK: 0, SPORTS_CAR: 0,
     };
 
+    const teamTotalProd = team.manufacturingSection.productionRuns.reduce((s, r) => s + r.units, 0);
+    const teamCapacity = calcs.spaceCostResult.totalCapacity;
+    const capacityScale = teamCapacity > 0 && teamTotalProd > teamCapacity ? teamCapacity / teamTotalProd : 1;
+
     for (const model of team.vehicleSection.models) {
       const run = team.manufacturingSection.productionRuns.find(
         (r) => r.modelId === model.id
@@ -453,13 +582,14 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
         continue;
       }
 
-      const unitsProduced = run.units;
+      const unitsProduced = Math.round(run.units * capacityScale);
       const reliabilityScore = calcs.reliabilityByModelId[model.id] ?? 1.0;
       const fleetRepairRate = computeFleetRepairRate(model.vehicleType, reliabilityScore);
       const recallTier = getRecallTier(fleetRepairRate);
       const unitCost = calcs.effectiveUnitCostByModelId[model.id] ?? 0;
       const salePrice = prodModel.salePrice;
 
+      const facilitiesCostResult = calcs.spaceCostResult;
       const byRegion: ModelResult["byRegion"] = [];
       let modelUnitsSold = 0;
       let modelRevenue = 0;
@@ -490,6 +620,8 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
         const effectiveInvPrice = Math.round(effectivePrice * (1 - inventoryDiscount / 100));
         const revenueHere = newSoldHere * effectivePrice + invSoldHere * effectiveInvPrice;
 
+        const hasFactory = facilitiesCostResult.activeRegions.has(region);
+        const shippingCostHere = hasFactory ? 0 : soldHere * SHIPPING_COST_PER_UNIT;
         byRegion.push({
           region,
           allocated: totalAllocated,
@@ -497,6 +629,9 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
           sold: soldHere,
           effectivePrice,
           glutDiscount,
+          hasFactory,
+          shippingCostHere,
+          clearingPrice: clearingPriceByModelByRegion[team.teamId]?.[model.id]?.[region] ?? 0,
         });
 
         modelUnitsSold += soldHere;
@@ -510,6 +645,13 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       const unitsLeftInInventory = Math.max(0, unitsProduced - newProdSold);
       inventoryByType[model.vehicleType] += unitsLeftInInventory;
 
+      // Shipping surcharge: units sold in regions without a local facility cost extra
+      let shippingCosts = 0;
+      for (const r of byRegion) {
+        if (!facilitiesCostResult.activeRegions.has(r.region)) {
+          shippingCosts += r.sold * SHIPPING_COST_PER_UNIT;
+        }
+      }
       const modelCogs = unitsProduced * unitCost;
       const unmetDemand = Math.max(0, modelUnitsDemanded - modelUnitsSold);
       // Gross profit per unit if they had been sold
@@ -527,6 +669,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
         unitsLeftInInventory,
         revenue: Math.round(modelRevenue),
         cogs: Math.round(modelCogs),
+        shippingCosts: Math.round(shippingCosts),
         repairRevenue: 0, // filled below
         reliabilityScore,
         fleetRepairRate,
@@ -538,6 +681,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
 
       totalSalesRevenue += modelRevenue;
       totalCogs += modelCogs;
+      totalShipping += shippingCosts;
       totalUnitsSold += modelUnitsSold;
     }
 
@@ -578,8 +722,9 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       Math.round(totalSalesRevenue) + repairRevenue;
     const totalCostsAmount =
       Math.round(totalCogs) +
+      Math.round(totalShipping) +
       engineeringFees +
-      spaceCostResult.spaceCost +
+      spaceCostResult.totalCost +
       Math.round(rdSpend) +
       mktSpend +
       lobbySpend +
@@ -618,6 +763,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     const brandDelta = computeBrandPerceptionDelta({
       team,
       brandMarketingSpend: mktCalcs?.brandSpend ?? 0,
+      categoryMarketingSpend: mktCalcs?.categorySpend ?? 0,
       isAttackAd: mktCalcs?.isAttack ?? false,
       attackBackfireChance: 0.20,
       modelResults,
@@ -625,6 +771,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       publicPerception,
       worldEventPerceptionModifier: worldEventPerceptionMod,
       incomingAttackSpend,
+      brandPerceptionCurrent: brandPerceptionStart,
     });
 
     const brandPerceptionEnd = Math.max(
@@ -661,9 +808,12 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
         totalMarketingSpend: mktSpend,
         totalLobbyingSpend: lobbySpend,
         rdUnlocksPurchased: calcs.unlocksPurchased,
-        spaceSizeUsed: spaceCostResult.spaceSize,
-        spaceOwnership: spaceCostResult.spaceOwnership,
-        spaceAnnualCost: spaceCostResult.spaceCost,
+        spaceSizeUsed: spaceCostResult.totalCapacity > 0 ? `${spaceCostResult.totalCapacity} units` : "none",
+        spaceOwnership: spaceCostResult.activeRegions.size > 0 ? "active" : "none",
+        spaceAnnualCost: spaceCostResult.totalCost,
+        pricingResearchSegment: team.rdSection.recurring.pricingResearch
+          ? (team.rdSection.recurringTargets?.pricingResearch ?? undefined)
+          : undefined,
       },
       revenue: {
         sales: Math.round(totalSalesRevenue),
@@ -672,8 +822,9 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       },
       costs: {
         cogs: Math.round(totalCogs),
+        shipping: Math.round(totalShipping),
         engineeringFees,
-        spaceCost: spaceCostResult.spaceCost,
+        spaceCost: spaceCostResult.totalCost,
         rdSpend: Math.round(rdSpend),
         marketingSpend: mktSpend,
         lobbyingSpend: lobbySpend,
@@ -842,24 +993,11 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
   }
 
   // ── Step 19: Persist-ready data ───────────────────────────────────────────
-  // Updated team spaces
-  const updatedTeamSpaces: Record<string, { size: string; ownership: string } | null> = {
-    ...teamSpaces,
-  };
+  // Updated team facilities (persist owned facilities for next round)
+  const updatedTeamSpaces: Record<string, Array<{ region: string; size: string }>> = {};
   for (const team of teams) {
     const calcs = teamCalcs[team.teamId];
-    if (!calcs) continue;
-    const newSpace = calcs.spaceCostResult.newSpaceState;
-    if (newSpace) {
-      updatedTeamSpaces[team.teamId] = newSpace;
-    } else if (
-      team.manufacturingSection.spaceAction === "sell" ||
-      (team.manufacturingSection.spaceAction === "new" &&
-        team.manufacturingSection.spaceOwnership === "rent")
-    ) {
-      // If renting or sold, don't persist as owned space
-      updatedTeamSpaces[team.teamId] = null;
-    }
+    updatedTeamSpaces[team.teamId] = calcs?.spaceCostResult.newOwnedFacilities ?? team.currentFacilities;
   }
 
   // Demand by type (totals for next round)
@@ -896,6 +1034,40 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     })
     .sort((a, b) => b.revenue - a.revenue)
     .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
+
+  // ── Research payoffs: attach intel each team paid for (all results now exist) ──
+  for (const team of teams) {
+    const result = teamResultsMap[team.teamId];
+    if (!result) continue;
+    const targets = team.rdSection.recurringTargets ?? {};
+
+    if (team.rdSection.recurring.competitorResearch && targets.competitorResearch) {
+      const rival = teamResultsMap[targets.competitorResearch];
+      const rivalEntry = leaderboard.find((e) => e.teamId === targets.competitorResearch);
+      if (rival && rivalEntry) {
+        result.decisions.competitorIntel = {
+          brandName: rivalEntry.brandName,
+          marketShare: rivalEntry.marketShare,
+          models: rival.modelResults.map((m) => ({
+            modelName: m.modelName,
+            vehicleType: m.vehicleType,
+            salePrice: m.salePrice,
+            unitsSold: m.unitsSold,
+            unitsProduced: m.unitsProduced,
+          })),
+        };
+      }
+    }
+
+    if (team.rdSection.recurring.marketResearch && targets.marketResearch) {
+      const region = targets.marketResearch;
+      const demandByType: Record<string, number> = {};
+      for (const vt of VEHICLE_TYPES) {
+        demandByType[vt] = demandByTypeByRegion[vt]?.[region as Region] ?? 0;
+      }
+      result.decisions.marketIntel = { region, demandByType };
+    }
+  }
 
   // Segment crowding counts
   const segmentCrowding: Record<string, number> = {};
@@ -990,6 +1162,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     totalFlyingCarDemand: currentRoundTotalFlyingDemand,
     totalTraditionalDemand: priorTraditionalDemand,
     demandByType: currentDemandByType,
+    demandByTypeByRegion,
     leaderboard,
     segmentCrowding,
     averagePricesByType: avgPricesByType,
@@ -1040,6 +1213,7 @@ function buildEmptyOutput(input: ResolveRoundInput): ResolveRoundOutput {
       totalFlyingCarDemand: input.priorFlyingDemand,
       totalTraditionalDemand: input.priorTraditionalDemand,
       demandByType: {},
+      demandByTypeByRegion: {},
       leaderboard: [],
       segmentCrowding: {},
       averagePricesByType: {},
@@ -1082,6 +1256,7 @@ function buildZeroDemandOutput(input: ResolveRoundInput): ResolveRoundOutput {
       revenue: { sales: 0, repairs: 0, total: 0 },
       costs: {
         cogs: 0,
+        shipping: 0,
         engineeringFees: 0,
         spaceCost: 0,
         rdSpend: 0,
@@ -1125,6 +1300,7 @@ function buildZeroDemandOutput(input: ResolveRoundInput): ResolveRoundOutput {
       totalFlyingCarDemand: 0,
       totalTraditionalDemand: input.priorTraditionalDemand,
       demandByType: {},
+      demandByTypeByRegion: {},
       leaderboard: input.teams.map((t, i) => ({
         teamId: t.teamId,
         brandName: t.brandName,

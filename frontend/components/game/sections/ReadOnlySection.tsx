@@ -32,9 +32,11 @@ function fmtM(n: number) {
 export function ReadOnlySection({
   section,
   data,
+  currentFacilities = [],
 }: {
   section: SectionKey;
   data: unknown;
+  currentFacilities?: Array<{ region: string; size: string }>;
 }) {
   if (!data || typeof data !== "object") {
     return (
@@ -81,9 +83,7 @@ export function ReadOnlySection({
     const totalUnits = d.productionRuns.reduce((s, r) => s + r.units, 0);
     return (
       <div className="space-y-2">
-        <Row label="SPACE ACTION" value={d.spaceAction.toUpperCase()} />
-        {d.spaceSize && <Row label="SIZE" value={d.spaceSize.toUpperCase()} />}
-        {d.spaceOwnership && <Row label="OWNERSHIP" value={d.spaceOwnership.toUpperCase()} />}
+        <Row label="NEW FACILITIES" value={(d.newFacilities?.length ?? 0) + " added"} />
         <Row label="PRODUCTION RUNS" value={d.productionRuns.length + " models"} />
         <Row label="TOTAL UNITS" value={totalUnits.toLocaleString()} />
       </div>
@@ -95,15 +95,49 @@ export function ReadOnlySection({
     if (!d.models || d.models.length === 0) {
       return <div style={{ fontFamily: "var(--font-pixel-body)", fontSize: "1rem", color: "var(--px-gray)" }}>No pricing set yet.</div>;
     }
+    const coveredRegions = new Set(currentFacilities.map((f) => f.region));
+    const REGION_LABEL: Record<string, string> = {
+      WEST_COAST: "West Coast", NORTHEAST: "Northeast", SOUTHEAST: "Southeast", MIDWEST: "Midwest", SOUTHWEST: "Southwest",
+    };
     return (
       <div className="space-y-2">
-        {d.models.map((m) => (
-          <div key={m.modelId} className="pixel-card" style={{ padding: "0.5rem", borderColor: "var(--px-gray)" }}>
-            <Row label="MODEL ID" value={m.modelId.slice(0, 8) + "..."} />
-            <Row label="SALE PRICE" value={"$" + m.salePrice.toLocaleString()} />
-            <Row label="INV DISCOUNT" value={m.inventoryDiscount + "%"} />
-          </div>
-        ))}
+        {d.models.map((m) => {
+          const activeRegions = Object.entries(m.regionalAllocation ?? {})
+            .filter(([, pct]) => (pct as number) > 0)
+            .sort(([, a], [, b]) => (b as number) - (a as number));
+          const allocTotal = activeRegions.reduce((s, [, v]) => s + (v as number), 0);
+          const allocOk = Math.abs(allocTotal - 100) <= 1;
+          return (
+            <div key={m.modelId} className="pixel-card" style={{ padding: "0.5rem", borderColor: "var(--px-gray)" }}>
+              <Row label="SALE PRICE" value={"$" + m.salePrice.toLocaleString()} />
+              <Row label="INV DISCOUNT" value={m.inventoryDiscount + "%"} />
+              <div style={{ paddingTop: "0.25rem" }}>
+                <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.42rem", color: "var(--px-gray)", marginBottom: "0.35rem" }}>REGIONS</div>
+                {activeRegions.length === 0
+                  ? <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "1rem", color: "var(--px-pink)" }}>None set</span>
+                  : <div className="space-y-1">
+                      {activeRegions.map(([r, pct]) => {
+                        const hasFactory = coveredRegions.has(r);
+                        return (
+                          <div key={r} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                            <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.9rem", color: allocOk ? "var(--px-white)" : "var(--px-pink)" }}>
+                              {REGION_LABEL[r] ?? r} — {pct as number}%
+                            </span>
+                            <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.32rem", padding: "0.15rem 0.35rem", border: `2px solid ${hasFactory ? "var(--px-green)" : "var(--px-amber)"}`, color: hasFactory ? "var(--px-green)" : "var(--px-amber)", whiteSpace: "nowrap", flexShrink: 0 }}>
+                              {hasFactory ? "✓ LOCAL" : "+$1,500/unit"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {!allocOk && (
+                        <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.38rem", color: "var(--px-pink)", marginTop: "0.25rem" }}>⚠ Total ≠ 100%</div>
+                      )}
+                    </div>
+                }
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -113,7 +147,7 @@ export function ReadOnlySection({
     return (
       <div className="space-y-2">
         <Row label="BUDGET" value={fmtM(d.totalBudget)} />
-        <Row label="MESSAGING" value={d.messagingType.toUpperCase()} />
+        <Row label="CATEGORY SPLIT" value={`${d.categorySplit ?? 0}%`} />
         <Row label="TONE" value={d.tone.toUpperCase()} />
         <Row label="REGIONAL" value={d.regionalTargeting.toUpperCase()} />
         <Row label="TV/ONLINE" value={fmtM(d.channels.tv_online)} />

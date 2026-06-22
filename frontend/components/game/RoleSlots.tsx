@@ -34,7 +34,7 @@ export function RoleSlots({
               onClick={() => onSelect?.(role)}
               className="w-full text-left p-3 border-2 transition-none"
               style={{
-                borderColor: isSelected ? color : "#4a4a6a",
+                borderColor: isSelected ? color : "#8888aa",
                 background: isSelected ? `${color}22` : "#0a0a1a",
                 color: isSelected ? color : "#888899",
                 boxShadow: isSelected ? `3px 3px 0 ${color}55` : "none",
@@ -56,7 +56,7 @@ export function RoleSlots({
                   style={{
                     fontFamily: "var(--font-pixel-body), monospace",
                     fontSize: "1rem",
-                    color: isSelected ? color : "#666677",
+                    color: isSelected ? color : "#9999bb",
                   }}
                 >
                   {ROLE_DESCRIPTIONS[role]}
@@ -94,7 +94,7 @@ export function RoleSlots({
                   style={{
                     fontFamily: "var(--font-pixel), monospace",
                     fontSize: "0.55rem",
-                    color: isFilled ? color : "#4a4a6a",
+                    color: isFilled ? color : "#8888aa",
                   }}
                 >
                   {role}
@@ -103,7 +103,7 @@ export function RoleSlots({
                   style={{
                     fontFamily: "var(--font-pixel-body), monospace",
                     fontSize: "0.95rem",
-                    color: isFilled ? "#cccccc" : "#4a4a6a",
+                    color: isFilled ? "#cccccc" : "#8888aa",
                   }}
                 >
                   {isFilled ? filledBy : "— VACANT —"}
@@ -112,8 +112,8 @@ export function RoleSlots({
               <span
                 className="pixel-badge"
                 style={{
-                  color: isFilled ? color : "#4a4a6a",
-                  borderColor: isFilled ? color : "#4a4a6a",
+                  color: isFilled ? color : "#8888aa",
+                  borderColor: isFilled ? color : "#8888aa",
                   fontSize: "0.4rem",
                 }}
               >
@@ -125,7 +125,7 @@ export function RoleSlots({
                 style={{
                   fontFamily: "var(--font-pixel-body), monospace",
                   fontSize: "0.85rem",
-                  color: "#4a4a6a",
+                  color: "#8888aa",
                   marginTop: "0.2rem",
                 }}
               >

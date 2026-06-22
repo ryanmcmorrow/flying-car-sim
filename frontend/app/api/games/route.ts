@@ -84,18 +84,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const game = await db.game.create({
-    data: {
-      code,
-      facilitatorId: session.user.id,
-      mode: mode as "CLASSROOM" | "PARTY",
-      roundDurationSeconds: mode === "PARTY" ? roundDurationSeconds : null,
-      settings: {
-        economicCondition,
-        createdAt: new Date().toISOString(),
+  let game;
+  try {
+    game = await db.game.create({
+      data: {
+        code,
+        facilitatorId: session.user.id,
+        mode: mode as "CLASSROOM" | "PARTY",
+        roundDurationSeconds: mode === "PARTY" ? roundDurationSeconds : null,
+        settings: {
+          economicCondition,
+          createdAt: new Date().toISOString(),
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Foreign key") || msg.includes("P2003")) {
+      return NextResponse.json({ error: "Your session is stale — please log out and log back in." }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Database error: " + msg.slice(0, 120) }, { status: 500 });
+  }
 
   return NextResponse.json({ id: game.id, code: game.code, mode: game.mode }, { status: 201 });
 }

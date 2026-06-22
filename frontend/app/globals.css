@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -142,7 +141,7 @@
   --px-green: #39ff14;
   --px-amber: #ffbe0b;
   --px-white: #ffffff;
-  --px-gray: #4a4a6a;
+  --px-gray: #8888aa;
   --px-cyan-dark: #007a80;
   --px-pink-dark: #800037;
   --px-green-dark: #1d8009;
@@ -177,7 +176,6 @@
   font-family: var(--font-pixel), monospace;
   font-size: 0.65rem;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--px-bg);
   background: var(--px-cyan);
   border: 3px solid var(--px-white);
@@ -318,7 +316,6 @@
   font-family: var(--font-pixel), monospace;
   font-size: 0.5rem;
   color: var(--px-amber);
-  text-transform: uppercase;
   letter-spacing: 0.1em;
   display: block;
   margin-bottom: 0.4rem;
@@ -350,7 +347,6 @@
 .pixel-heading {
   font-family: var(--font-pixel), monospace;
   color: var(--px-cyan);
-  text-transform: uppercase;
   image-rendering: pixelated;
 }
 
@@ -383,7 +379,6 @@
 .pixel-badge {
   font-family: var(--font-pixel), monospace;
   font-size: 0.45rem;
-  text-transform: uppercase;
   padding: 0.2rem 0.5rem;
   border: 2px solid currentColor;
   letter-spacing: 0.05em;
@@ -436,6 +431,16 @@
 .pixel-select:focus {
   border-color: var(--px-white);
   box-shadow: 0 0 0 2px var(--px-cyan);
+}
+
+/* ── Hide number input spinners globally ── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 /* ── Transmission box ── */

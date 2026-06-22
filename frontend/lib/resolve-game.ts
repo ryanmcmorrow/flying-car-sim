@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { Prisma } from "@/app/generated/prisma/client";
 import { resolveRound } from "@/lib/engine/resolve-round";
+import { parseFacilities } from "@/lib/engine/financials";
 import { drawWorldEvent } from "@/lib/game-utils";
 import type { ResolveRoundInput, TeamInput } from "@/lib/engine/types";
 import type {
@@ -66,7 +67,7 @@ export async function resolveGameById(gameId: string): Promise<ResolveResult> {
   const policyScore = (settings.policyScore as number) ?? 0;
   const publicPerception = (settings.publicPerception as number) ?? 30;
   const teamBrandPerceptions = (settings.teamBrandPerceptions as Record<string, number>) ?? {};
-  const teamSpaces = (settings.teamSpaces as Record<string, { size: string; ownership: string } | null>) ?? {};
+  const teamSpaces = (settings.teamSpaces as Record<string, Array<{ region: string; size: string }>>) ?? {};
   const perceptionPolicyBonusPending = (settings.perceptionPolicyBonusPending as number) ?? 0;
   const priorDemandByTypeByRegion =
     (settings.demandByTypeByRegion as Record<VehicleType, Record<Region, number>>) ??
@@ -128,11 +129,7 @@ export async function resolveGameById(gameId: string): Promise<ResolveResult> {
       }
     }
 
-    const currentSpaceData = teamSpaces[team.id];
-    const currentSpace =
-      currentSpaceData?.ownership === "buy"
-        ? { size: currentSpaceData.size as "small" | "medium" | "large", ownership: "buy" as const }
-        : null;
+    const currentFacilities = parseFacilities(teamSpaces[team.id]);
 
     teamInputs.push({
       teamId: team.id,
@@ -147,7 +144,7 @@ export async function resolveGameById(gameId: string): Promise<ResolveResult> {
       existingRdUnlocks,
       installedBase,
       priorInventory,
-      currentSpace,
+      currentFacilities,
     });
   }
 

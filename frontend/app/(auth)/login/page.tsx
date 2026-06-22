@@ -165,7 +165,7 @@ export default function LoginPage() {
           style={{
             fontFamily: "var(--font-pixel), monospace",
             fontSize: "0.4rem",
-            color: "#4a4a6a",
+            color: "#8888aa",
             letterSpacing: "0.1em",
           }}
         >

@@ -41,24 +41,27 @@ export interface BrandPerceptionDelta {
   innovationEffect: number;
   industrySpillover: number;
   eventEffect: number;
+  brandDecay: number;
   total: number;
 }
 
 export function computeBrandPerceptionDelta(params: {
   team: TeamInput;
-  brandMarketingSpend: number; // brand-specific spend (not category)
+  brandMarketingSpend: number;
+  categoryMarketingSpend: number; // category spend gives a halo brand benefit
   isAttackAd: boolean;
   attackBackfireChance: number; // 0.20
   modelResults: ModelResult[];
   effectiveRdSpend: number;
   publicPerception: number;
   worldEventPerceptionModifier: number;
-  // From attacker: if this team is being attacked
   incomingAttackSpend: number;
+  brandPerceptionCurrent: number;
 }): BrandPerceptionDelta {
   const {
     team,
     brandMarketingSpend,
+    categoryMarketingSpend,
     isAttackAd,
     attackBackfireChance,
     modelResults,
@@ -66,12 +69,20 @@ export function computeBrandPerceptionDelta(params: {
     publicPerception,
     worldEventPerceptionModifier,
     incomingAttackSpend,
+    brandPerceptionCurrent,
   } = params;
 
-  // Marketing effect
+  // Brand marketing effect — log curve for diminishing returns.
+  // $5M → ~2.8 pts, $10M → ~4.4 pts, $20M → ~6.4 pts, $40M → ~8.8 pts.
   let marketingEffect = 0;
   if (!isAttackAd && brandMarketingSpend > 0) {
-    marketingEffect = (brandMarketingSpend / 10_000_000) * 3;
+    marketingEffect = Math.log(1 + brandMarketingSpend / 5_000_000) * 4;
+  }
+
+  // Category halo: being seen as a market-builder gives a small brand lift.
+  // Weaker than direct brand spend — max ~3 pts at $40M — but it adds up.
+  if (categoryMarketingSpend > 0) {
+    marketingEffect += Math.log(1 + categoryMarketingSpend / 10_000_000) * 2;
   }
   // Attack backfire
   if (isAttackAd && Math.random() < attackBackfireChance) {
@@ -83,6 +94,13 @@ export function computeBrandPerceptionDelta(params: {
       ? (incomingAttackSpend / 10_000_000) * 1.5
       : 0;
   marketingEffect -= attackPenalty;
+
+  // Brand decay — perception erodes 8% per round toward 0.
+  // Consistent brand spend ($5M per 1pt of decay) offsets the drift.
+  // At brand=50: decay=-4pts; need $20M brand spend to fully offset it.
+  const rawDecay = brandPerceptionCurrent * 0.08;
+  const decayOffset = Math.min(Math.abs(rawDecay), brandMarketingSpend / 5_000_000);
+  const brandDecay = -(Math.abs(rawDecay) - decayOffset) * Math.sign(brandPerceptionCurrent);
 
   // Quality effect (per model, weighted by units produced)
   let totalUnitsProduced = 0;
@@ -161,7 +179,8 @@ export function computeBrandPerceptionDelta(params: {
     recallPenalty +
     innovationEffect +
     industrySpillover +
-    eventEffect;
+    eventEffect +
+    brandDecay;
 
   return {
     marketingEffect: Math.round(marketingEffect * 100) / 100,
@@ -170,6 +189,7 @@ export function computeBrandPerceptionDelta(params: {
     innovationEffect: Math.round(innovationEffect * 100) / 100,
     industrySpillover,
     eventEffect,
+    brandDecay: Math.round(brandDecay * 100) / 100,
     total: Math.round(total * 100) / 100,
   };
 }
@@ -183,7 +203,9 @@ export function computeNewPublicPerception(
   newPolicyScore: number,
   worldEventPerceptionModifier: number
 ): { newPublicPerception: number; perceptionPolicyBonus: number } {
-  const categoryEffect = (totalCategoryMarketingSpend / 5_000_000) * 1;
+  // Log curve: $5M → ~1.4pts, $10M → ~2.2pts, $20M → ~3.2pts. Prevents one
+  // team's huge category spend from dominating public perception solo.
+  const categoryEffect = Math.log(1 + totalCategoryMarketingSpend / 5_000_000) * 2;
   const recallEffect = anyTeamHasCriticalRecall ? -2 : 0;
   const policyEffect = newPolicyScore > 10 ? 1 : 0;
   const eventEffect = worldEventPerceptionModifier;

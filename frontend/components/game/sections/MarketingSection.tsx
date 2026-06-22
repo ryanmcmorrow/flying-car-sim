@@ -1,5 +1,6 @@
 "use client";
 
+import { Tooltip } from "@/components/game/Tooltip";
 import type { MarketingSection as MarketingSectionType } from "@/types/decisions";
 
 const CHANNEL_MINIMUMS: Record<string, number> = {
@@ -17,10 +18,10 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 const CHANNEL_NOTES: Record<string, string> = {
-  tv_online: "Best for brand awareness — min $2M",
-  radio: "Local market boost — min $500K",
-  print: "Print/outdoor reach — min $300K",
-  paid_search: "Best for compact/sedan demand — min $800K",
+  tv_online: "Reaches the widest audience — commuters, families, thrill-seekers. Strong for aspirational and luxury buyers. Min $2M",
+  radio: "Reaches practical, regional buyers — tradespeople, commuters, rural markets. Min $500K",
+  print: "Reaches affluent, high-consideration buyers who research big purchases. Enthusiast press and luxury lifestyle. Min $300K",
+  paid_search: "Reaches buyers actively shopping now — price-conscious, comparison-driven. Best for value segments. Min $800K",
 };
 
 const EVENT_CATEGORIES = [
@@ -90,55 +91,65 @@ export function MarketingSection({
 
       {/* Total Budget */}
       <div>
-        <label className="pixel-label">TOTAL MARKETING BUDGET ($)</label>
+        <label className="pixel-label">TOTAL MARKETING BUDGET ($) <Tooltip text="Total dollars spent on marketing this year. This is your ceiling — channel allocation below cannot exceed it." /></label>
         <input
           type="number"
           min={0}
           value={value.totalBudget || ""}
           disabled={disabled}
-          placeholder="Enter total budget..."
+          placeholder="e.g. 5000000"
           onChange={(e) =>
             onChange({ ...value, totalBudget: parseInt(e.target.value) || 0 })
           }
           className="pixel-input"
           style={{ maxWidth: 220 }}
         />
-      </div>
-
-      {/* Messaging Type */}
-      <div>
-        <label className="pixel-label">MESSAGING TYPE</label>
-        <div className="flex gap-2">
-          {(["category", "brand"] as const).map((mt) => (
-            <button
-              key={mt}
-              disabled={disabled}
-              onClick={() => onChange({ ...value, messagingType: mt })}
-              className={`pixel-btn text-[0.45rem] px-4 py-2 ${
-                value.messagingType === mt ? "pixel-btn-pink" : ""
-              }`}
-            >
-              {mt === "category" ? "CATEGORY" : "BRAND"}
-            </button>
-          ))}
-        </div>
-        <p
-          style={{
-            fontFamily: "var(--font-pixel-body)",
-            fontSize: "0.9rem",
-            color: "var(--px-gray)",
-            marginTop: "0.25rem",
-          }}
-        >
-          {value.messagingType === "category"
-            ? "Grow the whole flying car market — benefits all teams"
-            : "Promote YOUR brand specifically — targeted reach"}
+        <p style={{ color: "var(--px-gray)", fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.8rem", marginTop: "0.4rem" }}>
+          Traditional auto industry median: ~$8M/yr per model. Below $3M and you&apos;re invisible.
         </p>
       </div>
 
+      {/* Category / Brand Split */}
+      {(() => {
+        const split = Math.min(100, Math.max(0, value.categorySplit ?? 0));
+        const catAmt = Math.round((value.totalBudget ?? 0) * split / 100);
+        const brandAmt = (value.totalBudget ?? 0) - catAmt;
+        return (
+          <div>
+            <label className="pixel-label">
+              CATEGORY SPLIT (%) <Tooltip text="What % of your budget goes to category marketing — growing the total flying car market for everyone. The rest goes to brand marketing, which shifts demand in your favour." />
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={split || ""}
+              disabled={disabled}
+              placeholder="0"
+              onChange={(e) => {
+                const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                onChange({ ...value, categorySplit: v });
+              }}
+              className="pixel-input"
+              style={{ maxWidth: 120 }}
+            />
+            {(value.totalBudget ?? 0) > 0 && (
+              <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: "var(--px-gray)", marginTop: "0.3rem" }}>
+                ${(catAmt / 1_000_000).toFixed(1)}M category (grows the market) · ${(brandAmt / 1_000_000).toFixed(1)}M brand (wins your share)
+              </p>
+            )}
+            {(value.totalBudget ?? 0) === 0 && (
+              <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: "var(--px-gray)", marginTop: "0.3rem" }}>
+                Set a total budget above to see the split.
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Tone */}
       <div>
-        <label className="pixel-label">TONE</label>
+        <label className="pixel-label">Tone <Tooltip text="Positive ads build your own brand equity. Attack ads damage a rival's brand — pick a target below. Attack backfires if you spend less than them on marketing." /></label>
         <div className="flex gap-2">
           {(["positive", "attack"] as const).map((t) => (
             <button
@@ -159,7 +170,7 @@ export function MarketingSection({
         </div>
         {value.tone === "attack" && (
           <div className="mt-2">
-            <label className="pixel-label">TARGET COMPETITOR</label>
+            <label className="pixel-label">Target Competitor</label>
             <select
               className="pixel-select"
               style={{ maxWidth: 260 }}
@@ -182,7 +193,7 @@ export function MarketingSection({
 
       {/* Channel Allocation */}
       <div>
-        <label className="pixel-label">CHANNEL ALLOCATION ($)</label>
+        <label className="pixel-label">CHANNEL ALLOCATION ($) <Tooltip text="Spread your budget across channels. Each channel has a minimum effective spend — allocating below minimum wastes the money. Total must not exceed your budget." /></label>
         <div className="space-y-3">
           {(Object.keys(value.channels) as Array<keyof typeof value.channels>).map(
             (ch) => {
@@ -272,7 +283,7 @@ export function MarketingSection({
 
       {/* Regional Targeting */}
       <div>
-        <label className="pixel-label">REGIONAL TARGETING</label>
+        <label className="pixel-label">Regional Targeting <Tooltip text="National spreads your ad budget evenly across all 5 regions. Targeted lets you concentrate spend — great for defending a strong region or breaking into a new one." /></label>
         <div className="flex gap-2 mb-3">
           {(["national", "targeted"] as const).map((rt) => (
             <button

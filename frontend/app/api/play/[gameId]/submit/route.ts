@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resolveGameById } from "@/lib/resolve-game";
+import { computeSpaceCost, parseFacilities } from "@/lib/engine/financials";
+import type { TeamInput } from "@/lib/engine/types";
 import type { VehicleSection, ManufacturingSection, ProductionSection } from "@/types/decisions";
 
 // POST /api/play/[gameId]/submit — CEO submits the round
@@ -85,13 +87,7 @@ export async function POST(
     );
   }
 
-  const mfgSection = decision.manufacturingSection as unknown as ManufacturingSection;
-  if (!mfgSection?.spaceAction) {
-    return NextResponse.json(
-      { error: "COO must configure manufacturing space before submitting" },
-      { status: 422 }
-    );
-  }
+  // Manufacturing section: no hard-block (facilities can be empty in early rounds)
 
   const prodSection = decision.productionSection as unknown as ProductionSection;
   if (
@@ -100,9 +96,42 @@ export async function POST(
     !prodSection.models.every((m) => m.salePrice > 0)
   ) {
     return NextResponse.json(
+      { error: "CFO must set sale prices for all vehicle models before submitting" },
+      { status: 422 }
+    );
+  }
+
+  // Validate regional allocations total 100% per model
+  const badAllocs = prodSection.models.filter((m) => {
+    const total = Object.values(m.regionalAllocation ?? {}).reduce((s: number, v) => s + (v as number), 0);
+    return Math.abs(total - 100) > 1;
+  });
+  if (badAllocs.length > 0) {
+    return NextResponse.json(
+      { error: "CFO regional allocation must total 100% for all models. Check the CFO tab and use SPLIT EVENLY to balance." },
+      { status: 422 }
+    );
+  }
+
+  // Production must fit within factory capacity (owned + new this round).
+  // The engine builds exactly what's requested and bills COGS for it, so an
+  // unguarded over-run would manufacture phantom cars the team can't actually make.
+  const mfgSection = decision.manufacturingSection as unknown as ManufacturingSection;
+  const teamSpaces = (game.settings as Record<string, unknown>)?.teamSpaces as
+    | Record<string, unknown>
+    | undefined;
+  const capacity = computeSpaceCost({
+    currentFacilities: parseFacilities(teamSpaces?.[member.teamId]),
+    manufacturingSection: mfgSection,
+  } as TeamInput).totalCapacity;
+  const totalProduction = (mfgSection?.productionRuns ?? []).reduce(
+    (s, r) => s + (r.units ?? 0),
+    0
+  );
+  if (totalProduction > capacity) {
+    return NextResponse.json(
       {
-        error:
-          "CFO must set sale prices for all vehicle models before submitting",
+        error: `Production (${totalProduction.toLocaleString()} units) exceeds factory capacity (${capacity.toLocaleString()} units). Add facilities in the COO tab or reduce production runs.`,
       },
       { status: 422 }
     );

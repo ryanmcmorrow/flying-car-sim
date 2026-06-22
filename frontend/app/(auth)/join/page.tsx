@@ -229,8 +229,8 @@ export default function JoinPage() {
                   fontSize: "0.45rem",
                   padding: "0.2rem 0.5rem",
                   border: "2px solid",
-                  borderColor: step >= s ? "#00f5ff" : "#4a4a6a",
-                  color: step >= s ? "#00f5ff" : "#4a4a6a",
+                  borderColor: step >= s ? "#00f5ff" : "#8888aa",
+                  color: step >= s ? "#00f5ff" : "#8888aa",
                   background: step === s ? "#00f5ff22" : "transparent",
                 }}
               >
@@ -302,7 +302,7 @@ export default function JoinPage() {
             <div className="mt-6 text-center">
               <Link
                 href="/login"
-                style={{ fontSize: "1rem", color: "#4a4a6a" }}
+                style={{ fontSize: "1rem", color: "#8888aa" }}
               >
                 ← Back to login
               </Link>
@@ -330,7 +330,7 @@ export default function JoinPage() {
 
             <div
               style={{
-                border: "2px solid #4a4a6a",
+                border: "2px solid #8888aa",
                 background: "#0a0a1a",
                 padding: "0.75rem",
                 fontSize: "0.95rem",
@@ -426,7 +426,7 @@ export default function JoinPage() {
                   <div
                     style={{
                       background: "#0a0a1a",
-                      border: "2px solid #4a4a6a",
+                      border: "2px solid #8888aa",
                       padding: "0.5rem",
                     }}
                   >
@@ -471,7 +471,7 @@ export default function JoinPage() {
                 <div>
                   <label className="pixel-label">PICK YOUR ROLE</label>
                   {brandName.trim().length < 2 ? (
-                    <p style={{ fontSize: "1rem", color: "#4a4a6a", fontStyle: "italic" }}>
+                    <p style={{ fontSize: "1rem", color: "#8888aa", fontStyle: "italic" }}>
                       Enter a brand name first to see available roles.
                     </p>
                   ) : availableRoles.length === 0 ? (

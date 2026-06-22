@@ -56,6 +56,7 @@ export default async function PlayerLobbyPage({ params }: Props) {
     status: game.status as "LOBBY" | "ACTIVE" | "COMPLETED",
     currentRound: game.currentRound,
     mode: game.mode as string,
+    roundDurationSeconds: game.roundDurationSeconds,
     isHost,
     settings: game.settings as Record<string, unknown>,
     allTeams: game.teams.map((t) => ({

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { ALL_ROLES } from "@/lib/game-utils";
 import type { TeamMemberRole } from "@/app/generated/prisma/client";
 
-// POST /api/games/[id]/host-join — facilitator joins their own PARTY game as a player
+// POST /api/games/[id]/host-join — facilitator optionally joins their own game as a player
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -36,7 +36,6 @@ export async function POST(
 
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
   if (game.facilitatorId !== session.user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  if (game.mode !== "PARTY") return NextResponse.json({ error: "Only PARTY games support host-join" }, { status: 400 });
   if (game.status !== "LOBBY") return NextResponse.json({ error: "Game is not in LOBBY" }, { status: 400 });
 
   const cleanBrand = brandName.trim();
@@ -46,16 +45,25 @@ export async function POST(
   const alreadyMember = game.teams.some((t) => t.members.some((m) => m.userId === session.user.id));
   if (alreadyMember) return NextResponse.json({ error: "Already joined" }, { status: 409 });
 
-  // Find or create team
-  let team = game.teams.find((t) => t.brandName.toLowerCase() === cleanBrand.toLowerCase());
-  if (team) {
-    const roleTaken = team.members.some((m) => m.role === chosenRole);
-    if (roleTaken) return NextResponse.json({ error: `Role ${chosenRole} is already taken` }, { status: 400 });
-  } else {
+  const cleanBrandLower = cleanBrand.toLowerCase();
+  let team = game.teams.find((t) => t.brandName.toLowerCase() === cleanBrandLower);
+
+  if (game.mode === "PARTY") {
+    if (team) return NextResponse.json({ error: "BRAND NAME ALREADY TAKEN — CHOOSE A DIFFERENT NAME" }, { status: 400 });
     team = await db.team.create({
       data: { gameId: game.id, brandName: cleanBrand },
       include: { members: true },
     });
+  } else {
+    if (team) {
+      const roleTaken = team.members.some((m) => m.role === chosenRole);
+      if (roleTaken) return NextResponse.json({ error: `Role ${chosenRole} is already taken on that team` }, { status: 400 });
+    } else {
+      team = await db.team.create({
+        data: { gameId: game.id, brandName: cleanBrand },
+        include: { members: true },
+      });
+    }
   }
 
   await db.teamMember.create({

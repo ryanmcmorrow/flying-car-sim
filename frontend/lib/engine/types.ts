@@ -29,8 +29,8 @@ export interface TeamInput {
   existingRdUnlocks: string[];
   // Inventory left over from prior round by type
   priorInventory: Record<VehicleType, number>;
-  // Current space the team owns: null if renting/none, else { size, ownership }
-  currentSpace: { size: "small" | "medium" | "large"; ownership: "buy" } | null;
+  /** Facilities owned from prior rounds (auto-persist, pay maintenance) */
+  currentFacilities: Array<{ region: string; size: "small" | "medium" | "large" }>;
 }
 
 export interface WorldEventInput {
@@ -60,7 +60,7 @@ export interface ResolveRoundInput {
   policyScore: number;
   publicPerception: number;
   teamBrandPerceptions: Record<string, number>;
-  teamSpaces: Record<string, { size: string; ownership: string } | null>;
+  teamSpaces: Record<string, Array<{ region: string; size: string }>>;
   // perception policy bonus pending from last round
   perceptionPolicyBonusPending: number;
 }
@@ -79,6 +79,7 @@ export interface ModelResult {
   unitsLeftInInventory: number;
   revenue: number;
   cogs: number;
+  shippingCosts: number;
   repairRevenue: number;
   reliabilityScore: number;
   fleetRepairRate: number;
@@ -92,6 +93,10 @@ export interface ModelResult {
     sold: number;
     effectivePrice: number;
     glutDiscount: number;
+    hasFactory: boolean;
+    shippingCostHere: number;
+    /** Price that would have cleared exactly your allocated supply. 0 = demand-limited regardless. */
+    clearingPrice: number;
   }>;
 }
 
@@ -104,6 +109,25 @@ export interface TeamRoundResult {
     spaceSizeUsed: string;
     spaceOwnership: string;
     spaceAnnualCost: number;
+    /** Vehicle type the team subscribed to Pricing Research for this round */
+    pricingResearchSegment?: string;
+    /** Tracked rival's detail — present only if Competitor Research was bought with a target */
+    competitorIntel?: {
+      brandName: string;
+      marketShare: number;
+      models: Array<{
+        modelName: string;
+        vehicleType: string;
+        salePrice: number;
+        unitsSold: number;
+        unitsProduced: number;
+      }>;
+    };
+    /** Exact region demand — present only if Market Research was bought with a target region */
+    marketIntel?: {
+      region: string;
+      demandByType: Record<string, number>;
+    };
   };
   revenue: {
     sales: number;
@@ -112,6 +136,7 @@ export interface TeamRoundResult {
   };
   costs: {
     cogs: number;
+    shipping: number;
     engineeringFees: number;
     spaceCost: number;
     rdSpend: number;
@@ -152,6 +177,7 @@ export interface IndustrySnapshot {
   totalFlyingCarDemand: number;
   totalTraditionalDemand: number;
   demandByType: Record<string, number>;
+  demandByTypeByRegion: Record<string, Record<string, number>>;
   leaderboard: Array<{
     teamId: string;
     brandName: string;
@@ -201,7 +227,7 @@ export interface ResolveRoundOutput {
     policyScore: number;
     publicPerception: number;
     teamBrandPerceptions: Record<string, number>;
-    teamSpaces: Record<string, { size: string; ownership: string } | null>;
+    teamSpaces: Record<string, Array<{ region: string; size: string }>>;
     totalFlyingCarDemand: number;
     totalTraditionalDemand: number;
     demandByType: Record<string, number>;

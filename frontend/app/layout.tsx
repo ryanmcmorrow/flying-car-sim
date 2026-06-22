@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Press_Start_2P, VT323 } from "next/font/google";
+import { Press_Start_2P, Share_Tech_Mono } from "next/font/google";
 import "./globals.css";
 
 const pressStart2P = Press_Start_2P({
@@ -8,7 +8,7 @@ const pressStart2P = Press_Start_2P({
   subsets: ["latin"],
 });
 
-const vt323 = VT323({
+const shareTechMono = Share_Tech_Mono({
   weight: "400",
   variable: "--font-pixel-body",
   subsets: ["latin"],
@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${pressStart2P.variable} ${vt323.variable} h-full`}
+      className={`${pressStart2P.variable} ${shareTechMono.variable} h-full`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

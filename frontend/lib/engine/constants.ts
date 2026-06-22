@@ -119,6 +119,17 @@ export const PRICE_ELASTICITY: Record<VehicleType, number> = {
   SPORTS_CAR: 0, // prestige pricing — handled separately
 };
 
+// ── Absolute demand price curve ───────────────────────────────────────────────
+// Total market pool shrinks when industry avg price deviates from this range.
+// Below low: up to +15% boost. Above high: linear decline toward 0.25× floor.
+export const VEHICLE_PRICE_RANGE: Record<VehicleType, { low: number; high: number }> = {
+  COMPACT:    { low: 60_000,  high: 110_000 },
+  SEDAN:      { low: 75_000,  high: 140_000 },
+  SUV:        { low: 95_000,  high: 175_000 },
+  TRUCK:      { low: 85_000,  high: 160_000 },
+  SPORTS_CAR: { low: 110_000, high: 270_000 }, // wider band — prestige pricing expected
+};
+
 // ── Brand perception divisors and floors ──────────────────────────────────────
 export const BRAND_PERCEPTION_PARAMS: Record<
   VehicleType,
@@ -190,28 +201,31 @@ export const BASE_REPAIR_RATE: Record<VehicleType, number> = {
 
 export const AVG_REPAIR_VALUE = 2_400;
 
+/** Extra COGS per unit sold in a region with no local production facility */
+export const SHIPPING_COST_PER_UNIT = 1_500;
+
 // ── Manufacturing space costs ─────────────────────────────────────────────────
 export const SPACE_COSTS: Record<
   "small" | "medium" | "large",
   { capacity: number; rent: number; buyPrice: number; maintenance: number }
 > = {
   small: {
-    capacity: 500,
-    rent: 900_000,
-    buyPrice: 9_000_000,
-    maintenance: 350_000,
+    capacity: 5_000,
+    rent: 2_000_000,
+    buyPrice: 20_000_000,
+    maintenance: 750_000,
   },
   medium: {
-    capacity: 2_000,
-    rent: 2_600_000,
-    buyPrice: 28_000_000,
-    maintenance: 950_000,
+    capacity: 20_000,
+    rent: 6_000_000,
+    buyPrice: 60_000_000,
+    maintenance: 2_000_000,
   },
   large: {
-    capacity: 6_000,
-    rent: 6_500_000,
-    buyPrice: 65_000_000,
-    maintenance: 2_200_000,
+    capacity: 50_000,
+    rent: 14_000_000,
+    buyPrice: 140_000_000,
+    maintenance: 5_000_000,
   },
 };
 
@@ -282,14 +296,14 @@ export const RD_DEMAND_MULTIPLIERS: Record<string, number> = {
 
 // ── Feature demand bonuses ────────────────────────────────────────────────────
 export const FEATURE_DEMAND_BONUS: Record<string, number> = {
-  touchscreen: 0.01,
-  lane_assist: 0.015,
-  cameras: 0.01,
-  speakers: 0.005,
-  leather: 0.02,
-  phone_integration: 0.01,
-  virtual_assistant: 0.02,
-  entertainment: 0.015,
+  touchscreen:       0.012, // +1.2%
+  lane_assist:       0.020, // +2.0%
+  cameras:           0.010, // +1.0%
+  speakers:          0.010, // +1.0%
+  leather:           0.022, // +2.2%
+  phone_integration: 0.014, // +1.4%
+  virtual_assistant: 0.025, // +2.5%
+  entertainment:     0.018, // +1.8%
 };
 
 // ── Policy score demand multipliers ──────────────────────────────────────────

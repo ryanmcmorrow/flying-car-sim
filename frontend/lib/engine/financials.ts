@@ -43,6 +43,15 @@ export function computeTeamRdSpend(
     }
   }
 
+  // Market intel purchases ($2M each, one-time — only buy if not already owned)
+  const INTEL_COST = 2_000_000;
+  for (const key of rd.intelPurchases ?? []) {
+    if (!team.existingRdUnlocks.includes(key)) {
+      spend += INTEL_COST;
+      unlocksPurchased.push(key);
+    }
+  }
+
   // Charge full spend to cash; talent war only reduces benefit, not cost
   const totalRdSpend = spend;
   const effectiveRdSpend = spend * (1 - talentWarPenalty);
@@ -129,87 +138,68 @@ export function computeQualityScore(
   return qualityScore;
 }
 
-// ── Space cost computation ────────────────────────────────────────────────────
+// ── Facilities cost computation (multi-region) ───────────────────────────────
 
-export interface SpaceCostResult {
-  spaceCost: number;
-  spaceSize: string;
-  spaceOwnership: string;
-  newSpaceState: { size: "small" | "medium" | "large"; ownership: "buy" } | null;
+export interface FacilitiesCostResult {
+  totalCost: number;
+  totalCapacity: number;
+  /** Regions with at least one active facility this round */
+  activeRegions: Set<string>;
+  /** Facilities to persist into game state as owned going forward */
+  newOwnedFacilities: Array<{ region: string; size: string }>;
 }
 
-export function computeSpaceCost(
-  team: TeamInput
-): SpaceCostResult {
-  const mfg = team.manufacturingSection;
-  const action = mfg.spaceAction;
-  const size = mfg.spaceSize;
-  const ownership = mfg.spaceOwnership;
+/**
+ * Normalize a team's stored facilities into the array form the engine expects.
+ * Supports the legacy single-space `{ size, ownership }` shape (owned → MIDWEST).
+ */
+export function parseFacilities(
+  rawSpace: unknown
+): Array<{ region: string; size: "small" | "medium" | "large" }> {
+  if (Array.isArray(rawSpace)) {
+    return rawSpace as Array<{ region: string; size: "small" | "medium" | "large" }>;
+  }
+  if (rawSpace && (rawSpace as { ownership?: string }).ownership === "buy") {
+    return [{ region: "MIDWEST", size: (rawSpace as { size: string }).size as "small" | "medium" | "large" }];
+  }
+  return [];
+}
 
-  if (action === "keep") {
-    const currentSpace = team.currentSpace;
-    if (!currentSpace) {
-      // No space: nothing to keep — treat as zero cost
-      return {
-        spaceCost: 0,
-        spaceSize: "none",
-        spaceOwnership: "none",
-        newSpaceState: null,
-      };
-    }
-    const spaceData = SPACE_COSTS[currentSpace.size];
-    if (currentSpace.ownership === "buy") {
-      return {
-        spaceCost: spaceData.maintenance,
-        spaceSize: currentSpace.size,
-        spaceOwnership: "buy",
-        newSpaceState: currentSpace,
-      };
+export function computeSpaceCost(team: TeamInput): FacilitiesCostResult {
+  let totalCost = 0;
+  let totalCapacity = 0;
+  const activeRegions = new Set<string>();
+  const newOwnedFacilities: Array<{ region: string; size: string }> = [];
+
+  // Existing owned facilities: always persist, pay maintenance
+  for (const f of team.currentFacilities) {
+    const spaceData = SPACE_COSTS[f.size as "small" | "medium" | "large"];
+    if (!spaceData) continue;
+    totalCost += spaceData.maintenance;
+    totalCapacity += spaceData.capacity;
+    activeRegions.add(f.region);
+    newOwnedFacilities.push({ region: f.region, size: f.size });
+  }
+
+  const ownedKeys = new Set(team.currentFacilities.map((f) => `${f.region}::${f.size}`));
+
+  // New facilities being added this round
+  for (const f of team.manufacturingSection.newFacilities ?? []) {
+    const key = `${f.region}::${f.size}`;
+    if (ownedKeys.has(key)) continue; // already counted above
+    const spaceData = SPACE_COSTS[f.size];
+    if (!spaceData) continue;
+    totalCapacity += spaceData.capacity;
+    activeRegions.add(f.region);
+    if (f.ownership === "buy") {
+      totalCost += spaceData.buyPrice;
+      newOwnedFacilities.push({ region: f.region, size: f.size });
     } else {
-      // Renting — pay rent
-      return {
-        spaceCost: spaceData.rent,
-        spaceSize: currentSpace.size,
-        spaceOwnership: "rent",
-        newSpaceState: null,
-      };
+      totalCost += spaceData.rent;
     }
   }
 
-  if (action === "new" || action === "upgrade") {
-    if (!size) {
-      return {
-        spaceCost: 0,
-        spaceSize: "none",
-        spaceOwnership: "none",
-        newSpaceState: null,
-      };
-    }
-    const spaceData = SPACE_COSTS[size];
-    if (ownership === "buy") {
-      return {
-        spaceCost: spaceData.buyPrice,
-        spaceSize: size,
-        spaceOwnership: "buy",
-        newSpaceState: { size, ownership: "buy" },
-      };
-    } else {
-      return {
-        spaceCost: spaceData.rent,
-        spaceSize: size,
-        spaceOwnership: "rent",
-        newSpaceState: null,
-      };
-    }
-  }
-
-  // sell or no action
-  return {
-    spaceCost: 0,
-    spaceSize: "none",
-    spaceOwnership: "none",
-    newSpaceState: null,
-  };
+  return { totalCost, totalCapacity, activeRegions, newOwnedFacilities };
 }
 
 // ── Fleet repair revenue ──────────────────────────────────────────────────────

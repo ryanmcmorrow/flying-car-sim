@@ -22,6 +22,7 @@ import { MarketingSection as MarketingSectionComp } from "@/components/game/sect
 import { LobbyingSection as LobbyingSectionComp } from "@/components/game/sections/LobbyingSection";
 import { ReadOnlySection } from "@/components/game/sections/ReadOnlySection";
 import { SubmitPanel } from "@/components/game/SubmitPanel";
+import { YEAR1_DEMAND_BY_TYPE } from "@/lib/engine/constants";
 
 type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
@@ -48,17 +49,23 @@ interface DecisionRoomProps {
     submittedAt: string | null;
   };
   rdUnlocks: string[];
+  ownedExclusives?: Record<string, number>;
+  competitorExclusives?: Record<string, number>;
   competitors: Array<{ teamId: string; brandName: string }>;
   briefing: MarketBriefing | null;
+  totalFlyingDemand?: number;
+  flyingMedians: Record<string, number> | null;
+  inventoryItems: Array<{ modelName: string; vehicleType: string; unitCost: number; salePrice: number; unitsLeftInInventory: number; fromRound: number }> | null;
+  currentFacilities: Array<{ region: string; size: string }>;
 }
 
 
 const ALL_TABS: { role: TeamMemberRole; label: string; icon: string }[] = [
-  { role: "CEO", label: "CEO", icon: "🏛️" },
-  { role: "CFO", label: "CFO", icon: "💰" },
-  { role: "CMO", label: "CMO", icon: "📣" },
   { role: "CTO", label: "CTO", icon: "🔬" },
   { role: "COO", label: "COO", icon: "🏭" },
+  { role: "CFO", label: "CFO", icon: "💰" },
+  { role: "CMO", label: "CMO", icon: "📣" },
+  { role: "CEO", label: "CEO", icon: "🏛️" },
 ];
 
 // Role → sections that player can edit
@@ -70,21 +77,6 @@ const ROLE_EDITABLE: Record<TeamMemberRole, SectionKey[]> = {
   CEO: ["lobbyingSection"],
 };
 
-// Tab → sections to show
-const TAB_SECTIONS: Record<
-  TeamMemberRole,
-  { section: SectionKey; label: string }[]
-> = {
-  CEO: [{ section: "lobbyingSection", label: "LOBBYING" }],
-  CFO: [{ section: "productionSection", label: "PRICING & ALLOCATION" }],
-  CMO: [{ section: "marketingSection", label: "MARKETING" }],
-  CTO: [
-    { section: "vehicleSection", label: "VEHICLES" },
-    { section: "rdSection", label: "R&D" },
-  ],
-  COO: [{ section: "manufacturingSection", label: "MANUFACTURING" }],
-};
-
 export function DecisionRoom({
   gameId,
   game,
@@ -93,8 +85,14 @@ export function DecisionRoom({
   myRole,
   decision,
   rdUnlocks,
+  ownedExclusives = {},
+  competitorExclusives = {},
   competitors,
   briefing,
+  totalFlyingDemand,
+  flyingMedians,
+  inventoryItems,
+  currentFacilities,
 }: DecisionRoomProps) {
   // All section states
   const [vehicleSection, setVehicleSection] = useState<VehicleSection>(
@@ -116,7 +114,11 @@ export function DecisionRoom({
     decision.submittedAt
   );
 
-  const [activeTab, setActiveTab] = useState<TeamMemberRole>(myRole);
+  // CEO can edit all sections, so walk them through the workflow starting at CTO.
+  // Other roles open directly on their own tab.
+  const [activeTab, setActiveTab] = useState<TeamMemberRole>(
+    myRole === "CEO" || !myRole ? "CTO" : myRole as TeamMemberRole
+  );
   const router = useRouter();
 
   // Poll until round resolves then redirect to results.
@@ -129,7 +131,11 @@ export function DecisionRoom({
         if (!res.ok) return;
         const data = await res.json();
         if (data.round?.status === "RESOLVED") {
-          router.push(`/results/${gameId}/${data.round.roundNumber}`);
+          if (data.game?.status === "COMPLETED") {
+            router.push(`/results/${gameId}/final`);
+          } else {
+            router.push(`/results/${gameId}/${data.round.roundNumber}`);
+          }
         }
       } catch {
         // ignore poll errors
@@ -154,6 +160,15 @@ export function DecisionRoom({
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+
+  // Ticking clock so the "saved Xs ago" label stays current without calling
+  // Date.now() during render (which is impure).
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (saveStatus !== "saved" || !savedAt) return;
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [saveStatus, savedAt]);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaves = useRef<Map<SectionKey, unknown>>(new Map());
@@ -244,7 +259,7 @@ export function DecisionRoom({
     saveStatus === "saving" ? "● SAVING..." :
     saveStatus === "error" ? "✗ SAVE FAILED — retry?" :
     saveStatus === "saved" && savedAt
-      ? `✓ SAVED ${Math.floor((Date.now() - savedAt.getTime()) / 1000) < 5 ? "just now" : `${Math.floor((Date.now() - savedAt.getTime()) / 1000)}s ago`}`
+      ? `✓ SAVED ${Math.floor((nowMs - savedAt.getTime()) / 1000) < 5 ? "just now" : `${Math.floor((nowMs - savedAt.getTime()) / 1000)}s ago`}`
     : saveStatus === "unsaved" ? "● UNSAVED" : "✓ SAVED";
   const saveColor =
     saveStatus === "saving" || saveStatus === "unsaved" ? "var(--px-amber)" :
@@ -326,7 +341,7 @@ export function DecisionRoom({
             </div>
             {secondsLeft !== null && (
               <div className="text-center px-4">
-                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.42rem", color: "var(--px-gray)" }}>TIME LEFT</p>
+                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.42rem", color: "var(--px-gray)" }}>Time left</p>
                 <p style={{
                   fontFamily: "var(--font-pixel)",
                   fontSize: "1.1rem",
@@ -338,7 +353,7 @@ export function DecisionRoom({
               </div>
             )}
             <div className="text-right">
-              <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "var(--px-gray)" }}>CASH BALANCE</p>
+              <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "var(--px-gray)" }}>Cash balance</p>
               <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.75rem", color: "var(--px-green)" }}>
                 ${parseFloat(team.cash).toLocaleString()}
               </p>
@@ -358,7 +373,7 @@ export function DecisionRoom({
                   marginBottom: "0.5rem",
                 }}
               >
-                WORLD EVENT: {round.worldEvent.title}
+                World event: {round.worldEvent.title}
               </p>
               <p style={{ fontSize: "1.1rem" }}>{round.worldEvent.description}</p>
             </div>
@@ -374,27 +389,72 @@ export function DecisionRoom({
             </p>
           )}
 
-          {/* Market briefing (round 1) */}
-          {briefing && (
-            <div className="mt-3 pixel-transmission">
-              <p
-                style={{
-                  fontFamily: "var(--font-pixel)",
-                  fontSize: "0.5rem",
-                  color: "var(--px-green)",
-                  marginBottom: "0.4rem",
-                }}
-              >
-                YEAR 1 MARKET BRIEFING
-              </p>
-              <p>Total market demand: {briefing.totalFlyingCarDemand.toLocaleString()} units</p>
-              <p>Economy: {briefing.economicCondition}</p>
-              <p>Policy score: {briefing.policyScore}</p>
-              <p style={{ fontSize: "0.85rem", color: "var(--px-gray)", marginTop: "0.25rem" }}>
-                {briefing.npcLobbyingNote}
-              </p>
-            </div>
-          )}
+          {/* Market overview — always shown; precision gated behind market_analytics */}
+          {(() => {
+            const hasMarketAnalytics = rdUnlocks.includes("market_analytics");
+            const segmentDemand = briefing?.demandByType as Record<string, number> | undefined;
+            const SEGMENTS = [
+              { key: "COMPACT",    label: "Compact" },
+              { key: "SEDAN",      label: "Sedan" },
+              { key: "SUV",        label: "SUV" },
+              { key: "SPORTS_CAR", label: "Sports Car" },
+              { key: "TRUCK",      label: "Truck" },
+            ];
+            const maxDemand = YEAR1_DEMAND_BY_TYPE.COMPACT;
+            const totalFlying = totalFlyingDemand ?? briefing?.totalFlyingCarDemand ?? 300_000;
+            function qualLabel(demand: number) {
+              if (demand >= 80_000) return { label: "VERY HIGH", color: "var(--px-green)" };
+              if (demand >= 50_000) return { label: "HIGH",      color: "var(--px-green)" };
+              if (demand >= 30_000) return { label: "MEDIUM",    color: "var(--px-amber)" };
+              if (demand >= 15_000) return { label: "LOW",        color: "var(--px-pink)" };
+              return                       { label: "MINIMAL",    color: "var(--px-gray)" };
+            }
+            return (
+              <div className="mt-3 pixel-transmission">
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                  <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "var(--px-green)" }}>
+                    EST. FLYING CAR MARKET
+                  </p>
+                  <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-cyan)" }}>
+                    ~{Math.round(totalFlying / 10_000) * 10}K est. total demand
+                  </span>
+                </div>
+                {round.worldEvent && (
+                  <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: "var(--px-amber)", marginBottom: "0.4rem" }}>
+                    ⚠ World event above may shift these figures.
+                  </p>
+                )}
+                {SEGMENTS.map(({ key, label }) => {
+                  const demand = segmentDemand?.[key] ?? YEAR1_DEMAND_BY_TYPE[key as keyof typeof YEAR1_DEMAND_BY_TYPE];
+                  const { label: ql, color: qc } = qualLabel(demand);
+                  return (
+                    <div key={key} className="flex items-center gap-2 mb-2">
+                      <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "#cccccc", minWidth: "78px" }}>
+                        {label}
+                      </span>
+                      <div style={{ flex: 1, height: "6px", background: "#1a1a2e" }}>
+                        <div style={{ width: `${(demand / maxDemand) * 100}%`, height: "100%", background: hasMarketAnalytics ? "var(--px-cyan)" : qc, opacity: 0.6 }} />
+                      </div>
+                      {hasMarketAnalytics ? (
+                        <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-amber)", minWidth: "40px", textAlign: "right" }}>
+                          ~{Math.round(demand / 10_000) * 10}K
+                        </span>
+                      ) : (
+                        <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.35rem", color: qc, minWidth: "55px", textAlign: "right" }}>
+                          {ql}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {!hasMarketAnalytics && (
+                  <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: "var(--px-gray)", marginTop: "0.4rem" }}>
+                    Unlock <span style={{ color: "var(--px-cyan)" }}>Market Analytics</span> (R&amp;D) for precise demand figures.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Role Tabs */}
@@ -482,6 +542,9 @@ export function DecisionRoom({
                 <RdSectionComp
                   value={rdSection}
                   existingUnlocks={rdUnlocks}
+                  ownedExclusives={ownedExclusives}
+                  competitorExclusives={competitorExclusives}
+                  competitors={competitors}
                   onChange={handleRdChange}
                   disabled={isLocked}
                 />
@@ -504,6 +567,7 @@ export function DecisionRoom({
             canEdit("manufacturingSection") ? (
               <ManufacturingSectionComp
                 value={manufacturingSection}
+                currentFacilities={currentFacilities}
                 vehicleModels={vehicleSection.models}
                 onChange={handleMfgChange}
                 disabled={isLocked}
@@ -530,6 +594,9 @@ export function DecisionRoom({
               <ProductionSectionComp
                 value={productionSection}
                 vehicleModels={vehicleSection.models}
+                currentFacilities={currentFacilities}
+                flyingMedians={flyingMedians}
+                inventoryItems={inventoryItems}
                 onChange={handleProdChange}
                 disabled={isLocked}
               />
@@ -544,6 +611,7 @@ export function DecisionRoom({
                 <ReadOnlySection
                   section="productionSection"
                   data={productionSection}
+                  currentFacilities={currentFacilities}
                 />
               </div>
             )
@@ -581,6 +649,7 @@ export function DecisionRoom({
                 value={lobbyingSection}
                 onChange={handleLobbyChange}
                 disabled={isLocked}
+                currentPolicyScore={briefing?.policyScore ?? 0}
               />
             ) : (
               <div>

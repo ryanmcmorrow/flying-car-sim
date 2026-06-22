@@ -2,8 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ROLE_DESCRIPTIONS, ROLE_COLORS } from "@/lib/game-utils";
+import { Tooltip } from "@/components/game/Tooltip";
+import { IntroScreen } from "@/components/game/IntroScreen";
 import type { MarketBriefing } from "@/lib/game-utils";
 import type { TeamMemberRole } from "@/app/generated/prisma/client";
+import { SignOutButton } from "@/components/game/SignOutButton";
+import { YEAR1_DEMAND_BY_TYPE } from "@/lib/engine/constants";
 
 interface TeamMember {
   id: string;
@@ -24,6 +28,7 @@ interface GameData {
   status: "LOBBY" | "ACTIVE" | "COMPLETED";
   currentRound: number;
   mode: string;
+  roundDurationSeconds: number | null;
   isHost: boolean;
   settings: Record<string, unknown>;
   allTeams: LobbyTeam[];
@@ -41,7 +46,27 @@ interface Props {
   gameData: GameData;
 }
 
+function totalDemandLabel(n: number): { label: string; color: string } {
+  if (n >= 400_000) return { label: "VERY STRONG", color: "#39ff14" };
+  if (n >= 250_000) return { label: "STRONG",      color: "#39ff14" };
+  if (n >= 150_000) return { label: "MODERATE",    color: "#ffbe0b" };
+  return                   { label: "WEAK",         color: "#ff006e" };
+}
+
+function segmentDemandLabel(n: number): { label: string; color: string } {
+  if (n >= 80_000) return { label: "VERY HIGH", color: "#39ff14" };
+  if (n >= 50_000) return { label: "HIGH",      color: "#39ff14" };
+  if (n >= 30_000) return { label: "MEDIUM",    color: "#ffbe0b" };
+  if (n >= 15_000) return { label: "LOW",       color: "#ff006e" };
+  return                  { label: "MINIMAL",   color: "#8888aa" };
+}
+
 export function PlayerLobbyClient({ gameData: initial }: Props) {
+  const introKey = `intro-seen-${initial.id}`;
+  const [showIntro, setShowIntro] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !sessionStorage.getItem(`intro-seen-${initial.id}`);
+  });
   const [gameData, setGameData] = useState<GameData>(initial);
   const [showTransmission, setShowTransmission] = useState(
     initial.status === "ACTIVE"
@@ -129,6 +154,17 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
   // Extract world event from first round if available
   const worldEvent = (gameData.settings as Record<string, unknown>).worldEvent as { title: string; description: string } | undefined;
 
+  if (showIntro) {
+    return (
+      <IntroScreen
+        onContinue={() => {
+          sessionStorage.setItem(introKey, "1");
+          setShowIntro(false);
+        }}
+      />
+    );
+  }
+
   return (
     <div
       className="game-screen scanlines min-h-screen"
@@ -151,6 +187,9 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
         style={{ zIndex: 1 }}
       >
         {/* Header */}
+        <div className="flex justify-end mb-2">
+          <SignOutButton className="pixel-btn" style={{ fontSize: "0.4rem", background: "transparent", color: "#8888aa", border: "2px solid #8888aa", boxShadow: "none" }} />
+        </div>
         <div className="text-center mb-8">
           <h1
             className="pixel-heading"
@@ -184,13 +223,13 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="pixel-label">PILOT</p>
+              <p className="pixel-label">Founder</p>
               <p style={{ fontSize: "1.3rem", color: "#ffffff" }}>
                 {gameData.playerName}
               </p>
             </div>
             <div className="text-right">
-              <p className="pixel-label">CORPORATION</p>
+              <p className="pixel-label">Corporation</p>
               <p style={{ fontSize: "1.3rem", color: "#ffbe0b" }}>
                 {gameData.myTeam.brandName}
               </p>
@@ -222,14 +261,63 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
           </div>
         </div>
 
+        {/* Market Overview */}
+        <div className="pixel-card mb-6" style={{ borderColor: "var(--px-amber)" }}>
+          <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.55rem", color: "var(--px-amber)", marginBottom: "0.75rem" }}>
+            YEAR 1 MARKET PROJECTION
+          </p>
+          <div className="flex gap-3 mb-4">
+            <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(255,190,11,0.05)", border: "1px solid rgba(255,190,11,0.2)" }}>
+              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-gray)" }}>TOTAL MARKET</p>
+              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "#ffffff", marginTop: "0.2rem" }}>18.3M</p>
+              <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>vehicles / yr</p>
+            </div>
+            <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(0,245,255,0.05)", border: "1px solid rgba(0,245,255,0.2)" }}>
+              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-cyan)" }}>FLYING CARS</p>
+              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "var(--px-cyan)", marginTop: "0.2rem" }}>300K</p>
+              <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>~1.6% of market</p>
+            </div>
+            <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(136,136,170,0.05)", border: "1px solid rgba(136,136,170,0.2)" }}>
+              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-gray)" }}>COMPETITORS</p>
+              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "#ffffff", marginTop: "0.2rem" }}>{gameData.allTeams.length}</p>
+              <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>teams in game</p>
+            </div>
+          </div>
+          <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-gray)", marginBottom: "0.5rem" }}>
+            FLYING CAR DEMAND BY SEGMENT
+          </p>
+          {([
+            { label: "Compact",    demand: YEAR1_DEMAND_BY_TYPE.COMPACT },
+            { label: "Sedan",      demand: YEAR1_DEMAND_BY_TYPE.SEDAN },
+            { label: "SUV",        demand: YEAR1_DEMAND_BY_TYPE.SUV },
+            { label: "Sports Car", demand: YEAR1_DEMAND_BY_TYPE.SPORTS_CAR },
+            { label: "Truck",      demand: YEAR1_DEMAND_BY_TYPE.TRUCK },
+          ]).map(({ label, demand }) => (
+            <div key={label} className="flex items-center gap-2 mb-2">
+              <span style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.85rem", color: "#cccccc", minWidth: "78px" }}>
+                {label}
+              </span>
+              <div style={{ flex: 1, height: "6px", background: "#1a1a2e" }}>
+                <div style={{ width: `${(demand / YEAR1_DEMAND_BY_TYPE.COMPACT) * 100}%`, height: "100%", background: "var(--px-cyan)", opacity: 0.6 }} />
+              </div>
+              <span style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.85rem", color: "var(--px-amber)", minWidth: "40px", textAlign: "right" }}>
+                ~{Math.round(demand / 10_000) * 10}K
+              </span>
+            </div>
+          ))}
+          <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)", marginTop: "0.75rem" }}>
+            Demand shifts each year with world events, pricing, and tech. Share it equally and each team targets ~{gameData.allTeams.length > 0 ? Math.round(300_000 / gameData.allTeams.length / 1000) : "–"}K units.
+          </p>
+        </div>
+
         {/* Team roster */}
-        <div className="pixel-card mb-6" style={{ borderColor: "#4a4a6a" }}>
+        <div className="pixel-card mb-6" style={{ borderColor: "#8888aa" }}>
           <p className="pixel-label mb-3">
             TEAM ROSTER — {gameData.myTeam.brandName}
           </p>
           <div className="space-y-2">
             {gameData.myTeam.members.map((m) => {
-              const roleColor = ROLE_COLORS[m.role as TeamMemberRole] ?? "#4a4a6a";
+              const roleColor = ROLE_COLORS[m.role as TeamMemberRole] ?? "#8888aa";
               const isMe = m.userId === gameData.myTeam.members.find(
                 (me) => me.role === gameData.myRole
               )?.userId;
@@ -273,17 +361,17 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
         {gameData.status === "LOBBY" && gameData.isHost && (
           <>
             {/* All parties roster with kick buttons */}
-            <div className="pixel-card mb-4" style={{ borderColor: "#4a4a6a" }}>
+            <div className="pixel-card mb-4" style={{ borderColor: "#8888aa" }}>
               <p className="pixel-label mb-3">ALL PARTIES IN LOBBY ({gameData.allTeams.length})</p>
               {gameData.allTeams.length === 0 ? (
-                <p style={{ fontSize: "1rem", color: "#4a4a6a" }}>No players yet. Share the game code!</p>
+                <p style={{ fontSize: "1rem", color: "#8888aa" }}>No players yet. Share the game code!</p>
               ) : (
                 <div className="space-y-2">
                   {gameData.allTeams.map((t) => (
                     <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.4rem 0.5rem", border: "2px solid #2a2a3a" }}>
                       <div>
                         <span style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.5rem", color: "#ffbe0b" }}>{t.brandName}</span>
-                        <span style={{ fontSize: "0.9rem", color: "#666677", marginLeft: "0.5rem" }}>
+                        <span style={{ fontSize: "0.9rem", color: "#9999bb", marginLeft: "0.5rem" }}>
                           {t.members.map((m) => m.userName).join(", ")}
                         </span>
                       </div>
@@ -307,7 +395,9 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
             <div className="pixel-card text-center py-6" style={{ borderColor: "#ff006e", boxShadow: "4px 4px 0 #7d0030" }}>
               <p className="pixel-heading mb-3" style={{ fontSize: "0.55rem", color: "#ff006e" }}>⚡ HOST CONTROLS</p>
               <p style={{ fontSize: "1rem", color: "#888899", marginBottom: "1.5rem" }}>
-                Everyone in? Hit launch to start the 8-minute round timer.
+                {gameData.roundDurationSeconds
+                  ? `Everyone in? Hit launch to start the ${Math.round(gameData.roundDurationSeconds / 60)}-minute round timer.`
+                  : "Everyone in? Hit launch to start the game."}
               </p>
               {startError && (
                 <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.45rem", color: "#ff006e", marginBottom: "1rem" }}>❌ {startError}</p>
@@ -324,11 +414,11 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
             className="pixel-card text-center py-6"
             style={{ borderColor: "#ffbe0b", boxShadow: "4px 4px 0 #7d5d00" }}
           >
-            <p className="pixel-heading mb-4" style={{ fontSize: "0.55rem", color: "#ffbe0b" }}>WAITING FOR HOST</p>
+            <p className="pixel-heading mb-4" style={{ fontSize: "0.55rem", color: "#ffbe0b" }}>Waiting for host</p>
             <p style={{ fontSize: "1.1rem", color: "#888899", marginBottom: "1.5rem" }}>
-              The host will launch the game when everyone is ready. Hang tight, pilot.
+              The host will launch the game when everyone is ready. Hang tight, founder.
             </p>
-            <span className="blink" style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.45rem", color: "#4a4a6a" }}>
+            <span className="blink" style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.45rem", color: "#8888aa" }}>
               ■ POLLING FOR GAME START...
             </span>
           </div>
@@ -375,28 +465,28 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
               }}
             >
               <div>
-                <span style={{ color: "#888899" }}>TOTAL DEMAND:</span>
+                <span style={{ color: "#888899" }}>TOTAL DEMAND: <Tooltip text="How large the overall flying car market is this year. Invest in Market Research or Pricing Research to get closer estimates." /></span>
                 <br />
-                <span style={{ color: "#ffbe0b", fontSize: "1.2rem" }}>
-                  {briefing.totalFlyingCarDemand.toLocaleString()} UNITS
+                <span style={{ color: totalDemandLabel(briefing.totalFlyingCarDemand).color, fontSize: "1.2rem" }}>
+                  {totalDemandLabel(briefing.totalFlyingCarDemand).label}
                 </span>
               </div>
               <div>
-                <span style={{ color: "#888899" }}>ECONOMY:</span>
+                <span style={{ color: "#888899" }}>ECONOMY: <Tooltip text="STABLE = normal demand. GROWTH = +15% demand boost (boom times). RECESSION = -20% demand (only the strong survive)." /></span>
                 <br />
                 <span style={{ color: "#39ff14", textTransform: "uppercase", fontSize: "1.2rem" }}>
                   {briefing.economicCondition}
                 </span>
               </div>
               <div>
-                <span style={{ color: "#888899" }}>PUBLIC PERCEPTION:</span>
+                <span style={{ color: "#888899" }}>PUBLIC PERCEPTION: <Tooltip text="% of the general public open to buying a flying car. Higher % means a bigger potential market. Invest in lobbying and marketing to grow this over time." /></span>
                 <br />
                 <span style={{ color: "#00f5ff", fontSize: "1.2rem" }}>
                   {briefing.publicPerception}%
                 </span>
               </div>
               <div>
-                <span style={{ color: "#888899" }}>POLICY SCORE:</span>
+                <span style={{ color: "#888899" }}>POLICY SCORE: <Tooltip text="Shared industry policy score. Higher = more favourable regulations. Below 0 = hostile policy environment. The traditional auto lobby drains -3 pts/year automatically." /></span>
                 <br />
                 <span style={{ color: "#ff006e", fontSize: "1.2rem" }}>
                   {briefing.policyScore}
@@ -415,11 +505,11 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
                 style={{
                   fontFamily: "var(--font-pixel)",
                   fontSize: "0.42rem",
-                  color: "#666677",
+                  color: "#9999bb",
                   lineHeight: 1.8,
                 }}
               >
-                SEGMENT DEMAND BREAKDOWN
+                SEGMENT DEMAND BREAKDOWN <Tooltip text="Relative demand for each vehicle type. Invest in Market Research to sharpen these estimates. Design vehicles that target high-demand segments." />
               </p>
               <div
                 style={{
@@ -430,16 +520,19 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
                   fontSize: "0.95rem",
                 }}
               >
-                {Object.entries(briefing.demandByType).map(([type, demand]) => (
+                {Object.entries(briefing.demandByType).map(([type, demand]) => {
+                  const seg = segmentDemandLabel(demand as number);
+                  return (
                   <div key={type}>
-                    <span style={{ color: "#4a4a6a", textTransform: "uppercase" }}>
+                    <span style={{ color: "#8888aa", textTransform: "uppercase" }}>
                       {type}:{" "}
                     </span>
-                    <span style={{ color: "#cccccc" }}>
-                      {demand.toLocaleString()}
+                    <span style={{ color: seg.color }}>
+                      {seg.label}
                     </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               {briefing.npcLobbyingNote && (
                 <p
@@ -463,7 +556,7 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
                 color: "#39ff14",
               }}
             >
-              TRANSMISSION END — GOOD LUCK PILOT
+              TRANSMISSION END — GOOD LUCK FOUNDER
             </p>
 
             <a

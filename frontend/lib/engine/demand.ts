@@ -124,9 +124,11 @@ export function computeNextRoundDemand(
   // Organic growth
   const organicGrowth = currentFlyingDemand * ORGANIC_GROWTH_RATE;
 
-  // Category marketing bonus: (total_category_spend / 1M) × 0.01 × prior_flying
+  // Category marketing grows the total market — sqrt curve for diminishing returns.
+  // $4M → +6%, $16M → +12%, $36M → +18% of current flying demand added next round.
+  // Much stronger than brand spend (which only shifts share, not total size).
   const categoryBonus =
-    (categoryMarketingSpend / 1_000_000) * 0.01 * currentFlyingDemand;
+    Math.sqrt(categoryMarketingSpend / 1_000_000) * 0.03 * currentFlyingDemand;
 
   // Conversion: policy bonus
   const conversionPolicyBonus =

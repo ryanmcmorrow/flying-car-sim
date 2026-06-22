@@ -68,7 +68,7 @@ export default async function PlayPage({ params }: PageProps) {
     return (
       <div className="game-screen flex items-center justify-center min-h-screen">
         <div className="pixel-card text-center">
-          <p className="pixel-heading text-base mb-2">NO ACTIVE ROUND</p>
+          <p className="pixel-heading text-base mb-2">No active round</p>
           <p className="font-[var(--font-pixel-body)] text-lg" style={{ color: "var(--px-gray)" }}>
             Waiting for facilitator to open a round.
           </p>
@@ -93,17 +93,41 @@ export default async function PlayPage({ params }: PageProps) {
     update: {},
   });
 
-  // Load R&D unlocks for this team
+  // Load R&D unlocks for this team (with exclusivity windows)
   const rdUnlockRows = await db.rdUnlock.findMany({
     where: { teamId: team.id },
-    select: { unlockKey: true },
+    select: { unlockKey: true, exclusiveUntilRound: true },
   });
   const rdUnlocks = rdUnlockRows.map((r) => r.unlockKey);
+  const ownedExclusives: Record<string, number> = {};
+  for (const row of rdUnlockRows) {
+    if (row.exclusiveUntilRound !== null && row.exclusiveUntilRound >= game.currentRound) {
+      ownedExclusives[row.unlockKey] = row.exclusiveUntilRound;
+    }
+  }
+
+  // Competitor active exclusivities (other teams in this game holding an exclusive window)
+  const compExclusiveRows = await db.rdUnlock.findMany({
+    where: {
+      team: { gameId: game.id },
+      teamId: { not: team.id },
+      exclusiveUntilRound: { gte: game.currentRound },
+    },
+    select: { unlockKey: true, exclusiveUntilRound: true },
+  });
+  const competitorExclusives: Record<string, number> = {};
+  for (const row of compExclusiveRows) {
+    if (row.exclusiveUntilRound !== null) {
+      competitorExclusives[row.unlockKey] = row.exclusiveUntilRound;
+    }
+  }
 
   // Competitors (other teams)
   const competitors = game.teams
     .filter((t) => t.id !== team.id)
     .map((t) => ({ teamId: t.id, brandName: t.brandName }));
+
+  const totalFlyingDemand = (game.settings as Record<string, unknown>).totalFlyingCarDemand as number | undefined;
 
   // Market briefing (round 1 only)
   const briefing =
@@ -112,6 +136,77 @@ export default async function PlayPage({ params }: PageProps) {
           (game.settings as Record<string, string>)?.economicCondition ?? "stable"
         )
       : null;
+
+  // Inventory items from previous round (round 2+ only)
+  type InventoryItem = {
+    modelName: string;
+    vehicleType: string;
+    unitCost: number;
+    salePrice: number;
+    unitsLeftInInventory: number;
+    fromRound: number;
+  };
+  let inventoryItems: InventoryItem[] | null = null;
+  if (round.roundNumber > 1) {
+    const prevRound = game.rounds.find((r) => r.roundNumber === round.roundNumber - 1);
+    if (prevRound) {
+      const prevResult = await db.roundResult.findFirst({
+        where: { roundId: prevRound.id, teamId: team.id },
+        select: { teamResult: true },
+      });
+      if (prevResult) {
+        type MR = { modelName: string; vehicleType: string; unitCost: number; salePrice: number; unitsLeftInInventory: number };
+        const modelResults = ((prevResult.teamResult as Record<string, unknown>)?.modelResults as MR[] | undefined) ?? [];
+        const items = modelResults
+          .filter((mr) => mr.unitsLeftInInventory > 0)
+          .map((mr) => ({ ...mr, fromRound: prevRound.roundNumber }));
+        inventoryItems = items.length > 0 ? items : [];
+      }
+    }
+  }
+
+  // Flying car price medians from previous round (round 2+ only)
+  let flyingMedians: Record<string, number> | null = null;
+  if (round.roundNumber > 1) {
+    const prevRound = game.rounds.find((r) => r.roundNumber === round.roundNumber - 1);
+    if (prevRound) {
+      const prevDecisions = await db.decision.findMany({
+        where: { roundId: prevRound.id },
+        select: { vehicleSection: true, productionSection: true },
+      });
+      const pricesByType: Record<string, number[]> = {};
+      for (const dec of prevDecisions) {
+        const vs = dec.vehicleSection as { models?: { id: string; vehicleType: string }[] } | null;
+        const ps = dec.productionSection as { models?: { modelId: string; salePrice: number }[] } | null;
+        if (!vs?.models || !ps?.models) continue;
+        for (const pm of ps.models) {
+          if (!pm.salePrice) continue;
+          const vm = vs.models.find((m) => m.id === pm.modelId);
+          if (!vm) continue;
+          (pricesByType[vm.vehicleType] ??= []).push(pm.salePrice);
+        }
+      }
+      const medians: Record<string, number> = {};
+      for (const [type, prices] of Object.entries(pricesByType)) {
+        const sorted = [...prices].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        medians[type] = sorted.length % 2 === 0
+          ? Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+          : sorted[mid];
+      }
+      if (Object.keys(medians).length > 0) flyingMedians = medians;
+    }
+  }
+
+  // Load existing owned facilities from game settings
+  const rawTeamSpaces = (game.settings as Record<string, unknown>)?.teamSpaces as Record<string, unknown> | undefined;
+  const rawFacilities = rawTeamSpaces?.[team.id];
+  let currentFacilities: Array<{ region: string; size: string }> = [];
+  if (Array.isArray(rawFacilities)) {
+    currentFacilities = rawFacilities as Array<{ region: string; size: string }>;
+  } else if (rawFacilities && typeof rawFacilities === "object" && (rawFacilities as { ownership?: string }).ownership === "buy") {
+    currentFacilities = [{ region: "MIDWEST", size: (rawFacilities as { size: string }).size }];
+  }
 
   return (
     <DecisionRoom
@@ -147,8 +242,14 @@ export default async function PlayPage({ params }: PageProps) {
         submittedAt: decision.submittedAt?.toISOString() ?? null,
       }}
       rdUnlocks={rdUnlocks}
+      ownedExclusives={ownedExclusives}
+      competitorExclusives={competitorExclusives}
       competitors={competitors}
       briefing={briefing}
+      totalFlyingDemand={totalFlyingDemand}
+      flyingMedians={flyingMedians}
+      inventoryItems={inventoryItems}
+      currentFacilities={currentFacilities}
     />
   );
 }

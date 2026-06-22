@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+import { Tooltip } from "@/components/game/Tooltip";
 import type { LobbyingSection as LobbyingSectionType } from "@/types/decisions";
 
 const STEERING_CATEGORIES = [
@@ -27,21 +29,25 @@ export function LobbyingSection({
   value,
   onChange,
   disabled = false,
+  currentPolicyScore = 0,
 }: {
   value: LobbyingSectionType;
   onChange: (v: LobbyingSectionType) => void;
   disabled?: boolean;
+  currentPolicyScore?: number;
 }) {
   const points = computeLobbyPoints(value.lobbyingSpend);
   const steeringEligible = value.lobbyingSpend >= 6_000_000;
   const spendM = (value.lobbyingSpend / 1_000_000).toFixed(1);
 
-  // Pixel meter for policy score
-  const meterBlocks = 10;
-  const filledBlocks = Math.min(meterBlocks, points);
+  // Bidirectional meter: -10 to +10, 0 in the center
+  const RANGE = 10; // blocks per side
+  const projected = currentPolicyScore + points - 3; // -3 NPC drag always applies
 
   return (
     <div className="space-y-6">
+      {/* hide number input spinners */}
+      <style>{`input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}`}</style>
       <h2
         className="pixel-heading"
         style={{ fontSize: "0.8rem", color: "var(--px-amber)" }}
@@ -49,52 +55,60 @@ export function LobbyingSection({
         LOBBYING & POLICY
       </h2>
 
-      {/* Policy score display */}
+      {/* Policy score display — bidirectional meter */}
       <div className="pixel-card pixel-card-amber">
         <div className="flex items-center justify-between mb-3">
-          <span
-            style={{
-              fontFamily: "var(--font-pixel)",
-              fontSize: "0.5rem",
-              color: "var(--px-amber)",
-            }}
-          >
+          <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "var(--px-amber)" }}>
             POLICY SCORE
+            <Tooltip text="Shared industry policy score. Higher = more favourable regulations and better demand multipliers. Below 0 = hostile environment that crushes demand. The traditional auto lobby drains -3 pts/year automatically — you must spend to stay positive." />
           </span>
-          <span
-            style={{
-              fontFamily: "var(--font-pixel)",
-              fontSize: "0.75rem",
-              color: "var(--px-amber)",
-            }}
-          >
-            0
+          <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.75rem", color: currentPolicyScore >= 0 ? "var(--px-amber)" : "var(--px-pink)" }}>
+            {currentPolicyScore > 0 ? "+" : ""}{currentPolicyScore}
           </span>
         </div>
-        <div className="flex gap-1">
-          {Array.from({ length: meterBlocks }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: 12,
-                background:
-                  i < filledBlocks ? "var(--px-amber)" : "var(--px-gray)",
-                border: "1px solid var(--px-amber-dark)",
-              }}
-            />
-          ))}
+
+        {/* Bidirectional bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {/* Negative side (right-to-left fill from center) */}
+          {Array.from({ length: RANGE }).map((_, i) => {
+            const blockIdx = RANGE - 1 - i; // 9 = furthest left, 0 = adjacent to center
+            const filled = currentPolicyScore < 0 && blockIdx < Math.min(RANGE, Math.abs(currentPolicyScore));
+            return (
+              <div key={`neg-${i}`} style={{
+                flex: 1, height: 14,
+                background: filled ? "var(--px-pink)" : "var(--px-bg-2)",
+                border: "1px solid #3a2a3a",
+              }} />
+            );
+          })}
+          {/* Center marker */}
+          <div style={{ width: 4, height: 20, background: "var(--px-amber)", flexShrink: 0 }} />
+          {/* Positive side */}
+          {Array.from({ length: RANGE }).map((_, i) => {
+            const filled = currentPolicyScore > 0 && i < Math.min(RANGE, currentPolicyScore);
+            return (
+              <div key={`pos-${i}`} style={{
+                flex: 1, height: 14,
+                background: filled ? "var(--px-amber)" : "var(--px-bg-2)",
+                border: "1px solid #3a3a1a",
+              }} />
+            );
+          })}
         </div>
-        <p
-          style={{
-            fontFamily: "var(--font-pixel-body)",
-            fontSize: "0.9rem",
-            color: "var(--px-gray)",
-            marginTop: "0.5rem",
-          }}
-        >
-          Current score is 0 (Year 1 start)
-        </p>
+
+        {/* Axis labels */}
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem" }}>
+          <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: "var(--px-pink)" }}>−{RANGE} HOSTILE</span>
+          <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: "var(--px-gray)" }}>0</span>
+          <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: "var(--px-amber)" }}>FRIENDLY +{RANGE}</span>
+        </div>
+
+        {/* Projected next year */}
+        {value.lobbyingSpend > 0 && (
+          <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.95rem", color: projected >= currentPolicyScore ? "var(--px-green)" : "var(--px-pink)", marginTop: "0.5rem" }}>
+            After this round: {projected > 0 ? "+" : ""}{projected} (your +{points} pts, auto −3 NPC)
+          </p>
+        )}
       </div>
 
       {/* NPC pressure reminder */}
@@ -111,43 +125,29 @@ export function LobbyingSection({
         >
           TRADITIONAL AUTO LOBBY: -3 pts/year (automatic)
         </span>
-        <p
-          style={{
-            fontFamily: "var(--font-pixel-body)",
-            fontSize: "0.9rem",
-            color: "var(--px-gray)",
-            marginTop: "0.25rem",
-          }}
-        >
-          The legacy auto industry applies -3 policy points every year. Spend
-          at least $3M to stay even.
+        <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "1rem", color: "var(--px-white)", marginTop: "0.25rem" }}>
+          The legacy auto industry applies −3 policy points every year. Spend at least $3M to stay even.
         </p>
       </div>
 
       {/* Lobbying spend */}
       <div>
-        <label className="pixel-label">LOBBYING SPEND ($)</label>
+        <label className="pixel-label">LOBBYING SPEND ($) <Tooltip text="Annual lobbying investment. Each $1M = +1 policy point up to $5M, then diminishing returns ($2M per point above that). The traditional auto lobby costs you -3 pts/year automatically." /></label>
         <input
           type="number"
           min={0}
           value={value.lobbyingSpend || ""}
           disabled={disabled}
-          placeholder="Enter spend in dollars..."
+          placeholder="e.g. 5000000"
           onChange={(e) =>
             onChange({ ...value, lobbyingSpend: parseInt(e.target.value) || 0 })
           }
+          onWheel={(e) => e.currentTarget.blur()}
           className="pixel-input"
-          style={{ maxWidth: 220 }}
+          style={{ maxWidth: 220, MozAppearance: "textfield" } as React.CSSProperties}
         />
-        <p
-          style={{
-            fontFamily: "var(--font-pixel-body)",
-            fontSize: "0.85rem",
-            color: "var(--px-gray)",
-            marginTop: "0.2rem",
-          }}
-        >
-          $1M = +1 pt (first $5M) | $2M = +1 pt (above $5M)
+        <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "1rem", color: "var(--px-white)", marginTop: "0.4rem" }}>
+          First $5M → +$1M per pt &nbsp;|&nbsp; Above $5M → +$2M per pt
         </p>
       </div>
 
@@ -186,7 +186,7 @@ export function LobbyingSection({
               marginBottom: 0,
             }}
           >
-            EVENT STEERING
+            EVENT STEERING <Tooltip text="Spend $6M+ to bias next round's world event toward a category that favors your strategy. The highest spender among eligible teams wins the steer." />
           </label>
           {!steeringEligible && (
             <span

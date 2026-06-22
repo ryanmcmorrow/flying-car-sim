@@ -42,6 +42,7 @@ export default async function ResultsPage({ params }: PageProps) {
   let teamId: string | null = null;
   let brandName: string | null = null;
   let myRole: string | null = null;
+  let rdUnlocks: string[] = [];
 
   if (!isFacilitator) {
     // Find team membership
@@ -57,6 +58,9 @@ export default async function ResultsPage({ params }: PageProps) {
     teamId = membership.teamId;
     brandName = membership.team.brandName;
     myRole = membership.role;
+
+    const unlockRows = await db.rdUnlock.findMany({ where: { teamId }, select: { unlockKey: true } });
+    rdUnlocks = unlockRows.map((r) => r.unlockKey);
   } else {
     if (game.facilitatorId !== userId) {
       redirect("/game");
@@ -123,6 +127,7 @@ export default async function ResultsPage({ params }: PageProps) {
       gameId={gameId}
       roundNumber={roundNumber}
       totalRounds={8}
+      latestRound={game.currentRound}
       brandName={brandName ?? "FACILITATOR VIEW"}
       myRole={myRole}
       isFacilitator={isFacilitator}
@@ -131,6 +136,7 @@ export default async function ResultsPage({ params }: PageProps) {
       allTeamResults={
         isFacilitator ? allTeamResults : undefined
       }
+      rdUnlocks={rdUnlocks}
     />
   );
 }

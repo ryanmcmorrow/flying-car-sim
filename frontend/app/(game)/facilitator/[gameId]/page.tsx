@@ -64,5 +64,5 @@ export default async function FacilitatorGameLobbyPage({ params }: Props) {
     })),
   };
 
-  return <FacilitatorLobbyClient game={gameData} />;
+  return <FacilitatorLobbyClient game={gameData} myUserId={session.user.id} />;
 }
