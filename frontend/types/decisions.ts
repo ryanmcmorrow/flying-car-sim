@@ -43,17 +43,15 @@ export interface RdSection {
 }
 
 export type SpaceSize = "small" | "medium" | "large";
-export type SpaceOwnership = "rent" | "buy";
 export type FacilityRegion = "WEST_COAST" | "NORTHEAST" | "SOUTHEAST" | "MIDWEST" | "SOUTHWEST";
 
 export interface Facility {
   region: FacilityRegion;
   size: SpaceSize;
-  ownership: SpaceOwnership;
 }
 
 export interface ManufacturingSection {
-  /** New facilities being added this round (rent = this year only; buy = permanent) */
+  /** New facilities built this round — paid upfront, owned permanently */
   newFacilities: Facility[];
   productionRuns: Array<{
     modelId: string;

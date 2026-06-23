@@ -183,7 +183,7 @@ export function computeSpaceCost(team: TeamInput): FacilitiesCostResult {
 
   const ownedKeys = new Set(team.currentFacilities.map((f) => `${f.region}::${f.size}`));
 
-  // New facilities being added this round
+  // New facilities built this round — always purchased (no renting)
   for (const f of team.manufacturingSection.newFacilities ?? []) {
     const key = `${f.region}::${f.size}`;
     if (ownedKeys.has(key)) continue; // already counted above
@@ -191,12 +191,8 @@ export function computeSpaceCost(team: TeamInput): FacilitiesCostResult {
     if (!spaceData) continue;
     totalCapacity += spaceData.capacity;
     activeRegions.add(f.region);
-    if (f.ownership === "buy") {
-      totalCost += spaceData.buyPrice;
-      newOwnedFacilities.push({ region: f.region, size: f.size });
-    } else {
-      totalCost += spaceData.rent;
-    }
+    totalCost += spaceData.buyPrice;
+    newOwnedFacilities.push({ region: f.region, size: f.size });
   }
 
   return { totalCost, totalCapacity, activeRegions, newOwnedFacilities };

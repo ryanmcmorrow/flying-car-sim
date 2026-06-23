@@ -207,25 +207,22 @@ export const SHIPPING_COST_PER_UNIT = 1_500;
 // ── Manufacturing space costs ─────────────────────────────────────────────────
 export const SPACE_COSTS: Record<
   "small" | "medium" | "large",
-  { capacity: number; rent: number; buyPrice: number; maintenance: number }
+  { capacity: number; buyPrice: number; maintenance: number }
 > = {
   small: {
     capacity: 5_000,
-    rent: 2_000_000,
-    buyPrice: 20_000_000,
-    maintenance: 750_000,
+    buyPrice: 40_000_000,
+    maintenance: 3_000_000,
   },
   medium: {
     capacity: 20_000,
-    rent: 6_000_000,
-    buyPrice: 60_000_000,
-    maintenance: 2_000_000,
+    buyPrice: 120_000_000,
+    maintenance: 8_000_000,
   },
   large: {
     capacity: 50_000,
-    rent: 14_000_000,
-    buyPrice: 140_000_000,
-    maintenance: 5_000_000,
+    buyPrice: 300_000_000,
+    maintenance: 20_000_000,
   },
 };
 

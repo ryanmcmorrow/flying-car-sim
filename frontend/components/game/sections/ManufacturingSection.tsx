@@ -2,13 +2,13 @@
 
 import React from "react";
 import { Tooltip } from "@/components/game/Tooltip";
-import type { ManufacturingSection as ManufacturingSectionType, SpaceSize, SpaceOwnership, FacilityRegion, Facility, VehicleModel } from "@/types/decisions";
+import type { ManufacturingSection as ManufacturingSectionType, SpaceSize, FacilityRegion, Facility, VehicleModel } from "@/types/decisions";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const SPACE_OPTS = [
-  { size: "small" as SpaceSize,  label: "SMALL",  capacity: 5_000,  rent: "$2M/yr",  buy: "$20M",  maintenance: "$750K/yr"  },
-  { size: "medium" as SpaceSize, label: "MEDIUM", capacity: 20_000, rent: "$6M/yr",  buy: "$60M",  maintenance: "$2M/yr"    },
-  { size: "large" as SpaceSize,  label: "LARGE",  capacity: 50_000, rent: "$14M/yr", buy: "$140M", maintenance: "$5M/yr"    },
+  { size: "small" as SpaceSize,  label: "SMALL",  capacity: 5_000,  buy: "$40M",  maintenance: "$3M/yr"  },
+  { size: "medium" as SpaceSize, label: "MEDIUM", capacity: 20_000, buy: "$120M", maintenance: "$8M/yr"  },
+  { size: "large" as SpaceSize,  label: "LARGE",  capacity: 50_000, buy: "$300M", maintenance: "$20M/yr" },
 ] as const;
 
 const CAPACITY: Record<SpaceSize, number> = { small: 5_000, medium: 20_000, large: 50_000 };
@@ -168,7 +168,7 @@ export function ManufacturingSection({
 
   // All active facilities = owned (from prior rounds) + new (this round)
   const allFacilities = [
-    ...currentFacilities.map((f) => ({ ...f, ownership: "buy" as SpaceOwnership, isOwned: true })),
+    ...currentFacilities.map((f) => ({ ...f, isOwned: true })),
     ...newFacilities.map((f) => ({ ...f, isOwned: false })),
   ];
   const totalCapacity = allFacilities.reduce((s, f) => s + (CAPACITY[f.size as SpaceSize] ?? 0), 0);
@@ -178,15 +178,13 @@ export function ManufacturingSection({
   // New-facility form state
   const [addingSize, setAddingSize] = React.useState<SpaceSize | null>(null);
   const [addingRegion, setAddingRegion] = React.useState<FacilityRegion | null>(null);
-  const [addingOwnership, setAddingOwnership] = React.useState<SpaceOwnership>("rent");
 
   function commitNewFacility() {
     if (!addingSize || !addingRegion) return;
-    const next: Facility = { region: addingRegion, size: addingSize, ownership: addingOwnership };
+    const next: Facility = { region: addingRegion, size: addingSize };
     onChange({ ...value, newFacilities: [...newFacilities, next] });
     setAddingSize(null);
     setAddingRegion(null);
-    setAddingOwnership("rent");
   }
 
   function removeNewFacility(idx: number) {
@@ -211,7 +209,7 @@ export function ManufacturingSection({
       <style>{`input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}`}</style>
 
       <h2 className="pixel-heading" style={{ fontSize: "0.75rem", color: "var(--px-cyan)" }}>
-        🏭 PRODUCTION FACILITIES <Tooltip text="Each facility adds production capacity and covers one region. Selling cars in a region with a local facility saves $1,500 shipping cost per unit. Rent = this year only. Buy = permanent (then just maintenance)." />
+        🏭 PRODUCTION FACILITIES <Tooltip text="Each facility adds production capacity and covers one region. Selling into a region with a local factory saves $1,500/unit in shipping. You own every factory you build — upfront price paid once, then annual maintenance." />
       </h2>
 
       {/* ── Coverage map ── */}
@@ -249,16 +247,16 @@ export function ManufacturingSection({
               const opt = SPACE_OPTS.find((o) => o.size === f.size);
               const reg = REGIONS.find((r) => r.id === f.region);
               return (
-                <div key={i} className="pixel-card flex items-center gap-3" style={{ borderColor: f.ownership === "buy" ? "var(--px-amber)" : "var(--px-cyan)", padding: "0.6rem 1rem" }}>
+                <div key={i} className="pixel-card flex items-center gap-3" style={{ borderColor: "var(--px-amber)", padding: "0.6rem 1rem" }}>
                   <div>{FACTORY_ART[f.size as SpaceSize]?.({ selected: true })}</div>
                   <div className="flex-1">
                     <div style={{ fontFamily: px, fontSize: "0.42rem", color: "var(--px-cyan)" }}>{opt?.label ?? f.size.toUpperCase()} · {reg?.label ?? f.region}</div>
                     <div style={{ fontFamily: body, fontSize: "0.9rem", color: "var(--px-gray)" }}>
-                      {opt?.capacity.toLocaleString()} units · {f.ownership === "buy" ? opt?.buy + " (buy)" : opt?.rent}
+                      {opt?.capacity.toLocaleString()} units · {opt?.buy} purchase · {opt?.maintenance} ongoing
                     </div>
                   </div>
-                  <div style={{ fontFamily: px, fontSize: "0.38rem", color: f.ownership === "buy" ? "var(--px-amber)" : "var(--px-cyan)", border: `2px solid ${f.ownership === "buy" ? "var(--px-amber)" : "var(--px-cyan)"}`, padding: "0.2rem 0.4rem" }}>
-                    {f.ownership.toUpperCase()}
+                  <div style={{ fontFamily: px, fontSize: "0.38rem", color: "var(--px-amber)", border: "2px solid var(--px-amber)", padding: "0.2rem 0.4rem" }}>
+                    OWNED
                   </div>
                   {!disabled && (
                     <button onClick={() => removeNewFacility(i)} style={{ fontFamily: px, fontSize: "0.4rem", color: "var(--px-pink)", border: "2px solid var(--px-pink)", padding: "0.2rem 0.4rem", background: "transparent", cursor: "pointer" }}>✕</button>
@@ -300,8 +298,8 @@ export function ManufacturingSection({
                   {FACTORY_ART[opt.size]?.({ selected: sel })}
                   <div style={{ fontFamily: px, fontSize: "0.42rem", color: sel ? "var(--px-cyan)" : "var(--px-white)" }}>{opt.label}</div>
                   <div style={{ fontFamily: body, fontSize: "0.85rem", color: "var(--px-gray)" }}>{opt.capacity.toLocaleString()} units</div>
-                  <div style={{ fontFamily: body, fontSize: "0.8rem", color: "var(--px-amber)" }}>Rent {opt.rent}</div>
-                  <div style={{ fontFamily: body, fontSize: "0.8rem", color: "var(--px-pink)" }}>Buy {opt.buy}</div>
+                  <div style={{ fontFamily: body, fontSize: "0.8rem", color: "var(--px-amber)" }}>{opt.buy} to build</div>
+                  <div style={{ fontFamily: body, fontSize: "0.8rem", color: "var(--px-gray)" }}>{opt.maintenance} maintenance</div>
                 </button>
               );
             })}
@@ -321,27 +319,11 @@ export function ManufacturingSection({
                   );
                 })}
               </div>
-            </>
-          )}
-
-          {/* Step 3: rent or buy */}
-          {addingSize && addingRegion && (
-            <>
-              <p style={{ fontFamily: px, fontSize: "0.38rem", color: "var(--px-gray)", marginBottom: "0.4rem" }}>STEP 3 — RENT OR BUY?</p>
-              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
-                {(["rent", "buy"] as SpaceOwnership[]).map((own) => {
-                  const opt = SPACE_OPTS.find((o) => o.size === addingSize)!;
-                  const sel = addingOwnership === own;
-                  return (
-                    <button key={own} onClick={() => setAddingOwnership(own)} style={{ fontFamily: px, fontSize: "0.4rem", padding: "0.5rem 1rem", border: `3px solid ${sel ? (own === "buy" ? "var(--px-amber)" : "var(--px-cyan)") : "var(--px-gray)"}`, background: sel ? "rgba(0,245,255,0.08)" : "var(--px-bg-2)", color: sel ? (own === "buy" ? "var(--px-amber)" : "var(--px-cyan)") : "var(--px-white)", cursor: "pointer" }}>
-                      {own === "rent" ? `RENT — ${opt.rent}` : `BUY — ${opt.buy} (then ${opt.maintenance})`}
-                    </button>
-                  );
-                })}
-              </div>
-              <button onClick={commitNewFacility} className="pixel-btn pixel-btn-green" style={{ fontFamily: px, fontSize: "0.45rem" }}>
-                ▶ ADD FACILITY
-              </button>
+              {addingRegion && (
+                <button onClick={commitNewFacility} className="pixel-btn pixel-btn-green" style={{ fontFamily: px, fontSize: "0.45rem" }}>
+                  ▶ BUILD FACTORY
+                </button>
+              )}
             </>
           )}
         </div>
