@@ -859,6 +859,28 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     };
   }
 
+  // ── Step 11b: Fix market share — use industry units sold, not potential demand ──
+  // Market share = your units sold / total units sold by ALL teams for that type.
+  // Computing it inside the team loop used totalDemand as denominator, which gives
+  // ~6% for a solo seller in a large market instead of 100%.
+  {
+    const totalSoldByType: Record<string, number> = {};
+    for (const team of teams) {
+      for (const mr of teamResultsMap[team.teamId]?.modelResults ?? []) {
+        totalSoldByType[mr.vehicleType] = (totalSoldByType[mr.vehicleType] ?? 0) + mr.unitsSold;
+      }
+    }
+    for (const team of teams) {
+      const result = teamResultsMap[team.teamId];
+      if (!result) continue;
+      for (const vt of VEHICLE_TYPES) {
+        const teamSold = result.modelResults.filter(m => m.vehicleType === vt).reduce((s, m) => s + m.unitsSold, 0);
+        const industrySold = totalSoldByType[vt] ?? 0;
+        result.marketShareByType[vt] = industrySold > 0 ? teamSold / industrySold : 0;
+      }
+    }
+  }
+
   // ── Step 12: Lobbying and policy update ───────────────────────────────────
   // Find which teams newly unlock all_electric this round
   const newAllElectricTeams: string[] = [];
