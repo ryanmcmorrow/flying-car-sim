@@ -27,7 +27,7 @@ import { SHIPPING_COST_PER_UNIT } from "./constants";
 import { computePolicyScoreUpdate } from "./lobbying";
 import { TECH_TREE_DEF } from "@/lib/decision-utils";
 
-const EXCLUSIVITY_WINDOW = 2; // rounds of exclusivity for first-mover R&D unlocks
+const EXCLUSIVITY_WINDOW = 1; // rounds of exclusivity for first-mover tier-2+ R&D unlocks
 
 export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
   const {
@@ -955,8 +955,10 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       );
       if (!prereqsMet) continue;
 
-      // Exclusivity: is this key claimed by another team already?
-      const isFirstMover = !firstMovers[key];
+      // Tier-1 nodes are non-exclusive — foundational tech, anyone can buy them.
+      // Tier-2+ gets first-mover exclusivity for EXCLUSIVITY_WINDOW rounds.
+      const isTier1 = (nodeDef.tier ?? 1) <= 1;
+      const isFirstMover = !isTier1 && !firstMovers[key];
       if (isFirstMover) {
         firstMovers[key] = team.teamId;
       }

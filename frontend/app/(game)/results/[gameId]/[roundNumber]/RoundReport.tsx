@@ -818,13 +818,21 @@ export function RoundReport({
           <p style={{ fontFamily: bodyFont, fontSize: "1.2rem", color: "#ffbe0b" }}>
             {snap.policyScore > 0 ? "+" : ""}{snap.policyScore}
           </p>
+          <p style={{ fontFamily: bodyFont, fontSize: "0.75rem", color: "#8888aa", marginTop: "0.2rem" }}>
+            {snap.policyScore >= 10 ? "Strong tailwind — +12–30% demand boost"
+              : snap.policyScore >= 5 ? "Mild tailwind — +5–12% demand boost"
+              : snap.policyScore >= 0 ? "Neutral — no regulatory impact on demand"
+              : snap.policyScore >= -5 ? "Headwind — ~4–7% demand reduction this round"
+              : snap.policyScore >= -10 ? "Strong headwind — ~7–15% demand reduction"
+              : "Hostile climate — severe demand suppression"}
+          </p>
         </div>
         <div className="border border-gray-700 p-3">
           <p className="text-xs text-gray-400 mb-1" style={{ fontFamily: pxFont }}>
             INDUSTRY PERCEPTION
           </p>
           <p style={{ fontFamily: bodyFont, fontSize: "1.2rem", color: "#00f5ff" }}>
-            {snap.publicPerception > 0 ? "+" : ""}{snap.publicPerception}
+            {snap.publicPerception > 0 ? "+" : ""}{Math.round(snap.publicPerception)}
           </p>
         </div>
       </div>
