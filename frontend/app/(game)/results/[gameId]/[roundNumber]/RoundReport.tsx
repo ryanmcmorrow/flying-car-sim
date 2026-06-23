@@ -605,24 +605,24 @@ function TradeReport({ snap, roundNumber }: { snap: IndustrySnapshotData; roundN
   return (
     <div className="mb-6" style={{ border: "2px solid #2a2a4a", background: "#05050e" }}>
       <div style={{ borderBottom: "2px solid #2a2a4a", padding: "0.4rem 0.75rem", display: "flex", alignItems: "baseline", gap: "1rem" }}>
-        <span style={{ fontFamily: px, fontSize: "0.5rem", color: "var(--px-cyan)", letterSpacing: "0.12em" }}>
+        <span style={{ fontFamily: px, fontSize: "0.65rem", color: "var(--px-cyan)", letterSpacing: "0.12em" }}>
           AERIAL AUTOMOTIVE NEWS
         </span>
-        <span style={{ fontFamily: body, fontSize: "0.85rem", color: "#8888aa" }}>
+        <span style={{ fontFamily: body, fontSize: "1rem", color: "#8888aa" }}>
           Year {roundNumber} Industry Report
         </span>
       </div>
       {items.map((item, i) => (
         <div key={i} style={{ padding: "0.55rem 0.75rem", borderBottom: i < items.length - 1 ? "1px solid #1a1a2e" : "none" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.15rem" }}>
-            <span style={{ fontFamily: px, fontSize: "0.3rem", color: "#8888aa", flexShrink: 0 }}>
+            <span style={{ fontFamily: px, fontSize: "0.42rem", color: "#8888aa", flexShrink: 0 }}>
               [{item.tag}]
             </span>
-            <span style={{ fontFamily: px, fontSize: "0.38rem", color: "var(--px-white)", lineHeight: 1.5 }}>
+            <span style={{ fontFamily: px, fontSize: "0.5rem", color: "var(--px-white)", lineHeight: 1.5 }}>
               {item.headline}
             </span>
           </div>
-          <p style={{ fontFamily: body, fontSize: "0.9rem", color: "#8888aa", lineHeight: 1.5, margin: 0 }}>
+          <p style={{ fontFamily: body, fontSize: "0.95rem", color: "#8888aa", lineHeight: 1.5, margin: 0 }}>
             {item.body}
           </p>
         </div>
