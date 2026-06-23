@@ -352,11 +352,29 @@ export function DecisionRoom({
                 </p>
               </div>
             )}
-            <div className="text-right">
-              <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "var(--px-gray)" }}>Cash balance</p>
-              <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.75rem", color: "var(--px-green)" }}>
-                ${parseFloat(team.cash).toLocaleString()}
-              </p>
+            <div className="text-right flex flex-col items-end gap-2">
+              <div>
+                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "var(--px-gray)" }}>Cash balance</p>
+                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.75rem", color: "var(--px-green)" }}>
+                  ${parseFloat(team.cash).toLocaleString()}
+                </p>
+              </div>
+              {round.roundNumber > 1 && (
+                <a
+                  href={`/results/${gameId}/${round.roundNumber - 1}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontFamily: "var(--font-pixel)",
+                    fontSize: "0.38rem",
+                    color: "var(--px-amber)",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
+                >
+                  ↗ ROUND {round.roundNumber - 1} REPORT
+                </a>
+              )}
             </div>
           </div>
 

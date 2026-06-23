@@ -23,10 +23,12 @@ import type {
 
 interface PageProps {
   params: Promise<{ gameId: string }>;
+  searchParams: Promise<{ from?: string }>;
 }
 
-export default async function PlayPage({ params }: PageProps) {
+export default async function PlayPage({ params, searchParams }: PageProps) {
   const { gameId } = await params;
+  const { from } = await searchParams;
 
   const session = await auth();
   if (!session?.user?.id) {
@@ -79,7 +81,9 @@ export default async function PlayPage({ params }: PageProps) {
 
   // If the previous round just resolved and this team hasn't started round N yet,
   // send them to the results page so they don't skip the round report.
-  if (round.roundNumber > 1) {
+  // Skip this redirect when navigating here from the results page itself (?from=results),
+  // otherwise the "CONTINUE TO NEXT ROUND" button creates an infinite redirect loop.
+  if (round.roundNumber > 1 && from !== "results") {
     const prevRound = game.rounds.find((r) => r.roundNumber === round.roundNumber - 1);
     if (prevRound) {
       const [prevResult, existingDecision] = await Promise.all([

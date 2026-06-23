@@ -647,6 +647,7 @@ export function RoundReport({
 }: RoundReportProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("pl");
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
   const tr = teamResultRaw as unknown as TeamResultData | null;
   const snap = industrySnapshotRaw as unknown as IndustrySnapshotData;
@@ -1497,31 +1498,128 @@ export function RoundReport({
 
       {/* Facilitator view: all team summaries */}
       {isFacilitator && allTeamResults && (
-        <div className="mb-6 border border-yellow-400 p-4">
+        <div className="mb-6">
           <p className="text-xs text-yellow-400 mb-3" style={{ fontFamily: pxFont }}>
-            ALL TEAM RESULTS (FACILITATOR)
+            ALL TEAM RESULTS
           </p>
-          {allTeamResults.map((t) => {
-            const r = t.teamResult as TeamResultData;
-            return (
-              <div key={t.teamId} className="mb-3 border-b border-gray-700 pb-3">
-                <p style={{ fontFamily: bodyFont, color: "#00f5ff", fontSize: "1rem" }}>
-                  {t.brandName}
-                </p>
-                <div className="flex gap-6 mt-1">
-                  <span style={{ fontFamily: bodyFont, color: "#39ff14", fontSize: "0.95rem" }}>
-                    Rev: {fmt(r?.revenue?.total ?? 0)}
-                  </span>
-                  <span style={{ fontFamily: bodyFont, color: netCashColor, fontSize: "0.95rem" }}>
-                    Net: {fmt(r?.netCashChange ?? 0)}
-                  </span>
-                  <span style={{ fontFamily: bodyFont, color: "#ffbe0b", fontSize: "0.95rem" }}>
-                    Cash: {fmt(parseFloat(r?.newCash ?? "0"))}
-                  </span>
+          <div className="space-y-3">
+            {allTeamResults.map((t) => {
+              const r = t.teamResult as TeamResultData;
+              const teamNet = r?.netCashChange ?? 0;
+              const teamNetColor = teamNet >= 0 ? "#39ff14" : "#ff006e";
+              const isExpanded = expandedTeams.has(t.teamId);
+              const brandDelta = r?.brandPerceptionDelta;
+              return (
+                <div key={t.teamId} className="border border-gray-600">
+                  {/* Collapse header — always visible */}
+                  <button
+                    onClick={() => setExpandedTeams((prev) => {
+                      const next = new Set(prev);
+                      next.has(t.teamId) ? next.delete(t.teamId) : next.add(t.teamId);
+                      return next;
+                    })}
+                    className="w-full flex items-center justify-between p-3"
+                    style={{ background: "transparent", border: "none", cursor: "pointer" }}
+                  >
+                    <span style={{ fontFamily: bodyFont, color: "#00f5ff", fontSize: "1rem" }}>{t.brandName}</span>
+                    <div className="flex items-center gap-4">
+                      <span style={{ fontFamily: bodyFont, color: "#39ff14", fontSize: "0.9rem" }}>
+                        Rev {fmt(r?.revenue?.total ?? 0)}
+                      </span>
+                      <span style={{ fontFamily: bodyFont, color: teamNetColor, fontSize: "0.9rem" }}>
+                        Net {teamNet >= 0 ? "+" : ""}{fmt(teamNet)}
+                      </span>
+                      <span style={{ fontFamily: bodyFont, color: "#ffbe0b", fontSize: "0.9rem" }}>
+                        Cash {fmt(parseFloat(r?.newCash ?? "0"))}
+                      </span>
+                      <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "#8888aa" }}>
+                        {isExpanded ? "▲" : "▼"}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Expanded detail */}
+                  {isExpanded && (
+                    <div className="px-3 pb-3 space-y-3" style={{ borderTop: "1px solid #333" }}>
+                      {/* P&L */}
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                          <p style={{ fontFamily: pxFont, fontSize: "0.42rem", color: "#8888aa", marginBottom: "0.4rem" }}>REVENUE</p>
+                          <div className="space-y-1">
+                            {([["Sales", r?.revenue?.sales ?? 0], ["Repairs", r?.revenue?.repairs ?? 0]] as [string, number][]).map(([lbl, amt]) => (
+                              <div key={lbl} className="flex justify-between">
+                                <span style={{ fontFamily: bodyFont, color: "#ccc", fontSize: "0.9rem" }}>{lbl}</span>
+                                <span style={{ fontFamily: bodyFont, color: "#39ff14", fontSize: "0.9rem" }}>{fmt(amt)}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between pt-1" style={{ borderTop: "1px solid #444" }}>
+                              <span style={{ fontFamily: bodyFont, color: "#fff", fontSize: "0.9rem", fontWeight: "bold" }}>Total</span>
+                              <span style={{ fontFamily: bodyFont, color: "#39ff14", fontSize: "0.9rem", fontWeight: "bold" }}>{fmt(r?.revenue?.total ?? 0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <p style={{ fontFamily: pxFont, fontSize: "0.42rem", color: "#8888aa", marginBottom: "0.4rem" }}>COSTS</p>
+                          <div className="space-y-1">
+                            {([
+                              ["COGS", r?.costs?.cogs ?? 0],
+                              ["R&D", r?.costs?.rdSpend ?? 0],
+                              ["Marketing", r?.costs?.marketingSpend ?? 0],
+                              ["Lobbying", r?.costs?.lobbyingSpend ?? 0],
+                              ["Facilities", r?.costs?.spaceCost ?? 0],
+                              ["Engineering", r?.costs?.engineeringFees ?? 0],
+                              ["Inv. Carry", r?.costs?.inventoryCarrying ?? 0],
+                            ] as [string, number][]).filter(([, amt]) => amt > 0).map(([lbl, amt]) => (
+                              <div key={lbl} className="flex justify-between">
+                                <span style={{ fontFamily: bodyFont, color: "#ccc", fontSize: "0.9rem" }}>{lbl}</span>
+                                <span style={{ fontFamily: bodyFont, color: "#ff006e", fontSize: "0.9rem" }}>{fmt(amt)}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between pt-1" style={{ borderTop: "1px solid #444" }}>
+                              <span style={{ fontFamily: bodyFont, color: "#fff", fontSize: "0.9rem", fontWeight: "bold" }}>Total</span>
+                              <span style={{ fontFamily: bodyFont, color: "#ff006e", fontSize: "0.9rem", fontWeight: "bold" }}>{fmt(r?.costs?.total ?? 0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Brand + model summary */}
+                      {brandDelta && (
+                        <div className="flex items-center gap-3">
+                          <span style={{ fontFamily: pxFont, fontSize: "0.38rem", color: "#8888aa" }}>BRAND</span>
+                          <span style={{ fontFamily: bodyFont, color: "#fff", fontSize: "0.9rem" }}>
+                            {r?.brandPerceptionStart ?? 0} → {r?.brandPerceptionEnd ?? 0}
+                          </span>
+                          <span style={{ fontFamily: bodyFont, color: brandDelta.total >= 0 ? "#39ff14" : "#ff006e", fontSize: "0.9rem" }}>
+                            ({brandDelta.total >= 0 ? "+" : ""}{brandDelta.total.toFixed(1)})
+                          </span>
+                        </div>
+                      )}
+                      {r?.modelResults && r.modelResults.length > 0 && (
+                        <div>
+                          <p style={{ fontFamily: pxFont, fontSize: "0.38rem", color: "#8888aa", marginBottom: "0.3rem" }}>VEHICLES</p>
+                          <div className="space-y-1">
+                            {r.modelResults.map((m) => (
+                              <div key={m.modelId} className="flex justify-between items-center">
+                                <span style={{ fontFamily: bodyFont, color: "#00f5ff", fontSize: "0.85rem" }}>{m.modelName}</span>
+                                <div className="flex gap-3">
+                                  <span style={{ fontFamily: bodyFont, color: "#ccc", fontSize: "0.85rem" }}>{fmtUnits(m.unitsSold)}/{fmtUnits(m.unitsProduced)} sold</span>
+                                  <span style={{ fontFamily: bodyFont, color: "#39ff14", fontSize: "0.85rem" }}>{fmt(m.revenue)}</span>
+                                  {m.recallTier !== "none" && (
+                                    <span style={{ fontFamily: bodyFont, color: "#ff006e", fontSize: "0.85rem" }}>⚠ {m.recallTier}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -1529,7 +1627,7 @@ export function RoundReport({
       <div className="mt-8 flex justify-center">
         {!isLastRound ? (
           <button
-            onClick={() => router.push(`/play/${gameId}`)}
+            onClick={() => router.push(`/play/${gameId}?from=results`)}
             className="pixel-btn pixel-btn-green"
             style={{ fontFamily: pxFont, fontSize: "0.55rem" }}
           >
