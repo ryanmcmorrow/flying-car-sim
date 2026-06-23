@@ -631,7 +631,160 @@ function TradeReport({ snap, roundNumber }: { snap: IndustrySnapshotData; roundN
   );
 }
 
-type TabKey = "pl" | "vehicles" | "market";
+type TabKey = "pl" | "vehicles" | "market" | "reviews";
+
+// ── Customer review generator ─────────────────────────────────────────────────
+
+interface GeneratedReview {
+  stars: 1 | 2 | 3 | 4 | 5;
+  reviewer: string;
+  location: string;
+  title: string;
+  body: string;
+}
+
+const REVIEWER_NAMES = [
+  "Jordan K.", "Sam T.", "Alex M.", "Pat R.", "Riley S.",
+  "Casey B.", "Taylor W.", "Morgan F.", "Jamie L.", "Drew N.",
+  "Avery P.", "Quinn H.", "Harper C.", "Reese D.", "Skyler J.",
+];
+
+const REGION_CITIES: Record<string, string[]> = {
+  WEST_COAST: ["San Francisco, CA", "Seattle, WA", "Los Angeles, CA", "Portland, OR", "San Jose, CA"],
+  NORTHEAST:  ["New York, NY", "Boston, MA", "Philadelphia, PA", "Washington, DC", "Providence, RI"],
+  SOUTHEAST:  ["Miami, FL", "Atlanta, GA", "Charlotte, NC", "Nashville, TN", "Orlando, FL"],
+  MIDWEST:    ["Chicago, IL", "Minneapolis, MN", "Detroit, MI", "Columbus, OH", "Indianapolis, IN"],
+  SOUTHWEST:  ["Phoenix, AZ", "Denver, CO", "Dallas, TX", "Las Vegas, NV", "Austin, TX"],
+};
+
+function generateReviews(
+  tr: TeamResultData,
+  snap: IndustrySnapshotData,
+  brandName: string,
+  roundNumber: number
+): GeneratedReview[] {
+  const reviews: GeneratedReview[] = [];
+  const seed = roundNumber * 7 + 13;
+  function pickArr<T>(arr: T[], offset = 0): T { return arr[Math.abs(seed + offset) % arr.length]; }
+
+  const modelResults = tr.modelResults ?? [];
+  const topModel = modelResults.reduce<typeof modelResults[0] | undefined>(
+    (best, m) => (m.unitsSold > (best?.unitsSold ?? -1) ? m : best), undefined
+  );
+  const totalUnitsProduced = modelResults.reduce((s, m) => s + m.unitsProduced, 0);
+  const totalUnitsSold    = modelResults.reduce((s, m) => s + m.unitsSold,    0);
+  const totalUnsold        = modelResults.reduce((s, m) => s + m.unitsLeftInInventory, 0);
+  const hasCriticalRecall  = modelResults.some(m => m.recallTier === "critical");
+  const hasMajorRecall     = modelResults.some(m => m.recallTier === "major");
+  const hasRecall          = hasCriticalRecall || hasMajorRecall;
+  const sellThrough        = totalUnitsProduced > 0 ? totalUnitsSold / totalUnitsProduced : 1;
+  const brandDelta         = tr.brandPerceptionDelta?.total ?? 0;
+  const marketShareVals    = Object.values(tr.marketShareByType ?? {});
+  const avgMarketShare     = marketShareVals.length > 0 ? marketShareVals.reduce((s, v) => s + v, 0) / marketShareVals.length : 0;
+
+  // Compare price to industry average for the top model's type
+  const avgPrice = topModel ? (snap.averagePricesByType?.[topModel.vehicleType] ?? topModel.salePrice) : 0;
+  const priceVsAvg = topModel && avgPrice > 0 ? topModel.salePrice / avgPrice : 1;
+
+  // Worst-supplied region (lowest sold/demanded ratio)
+  let worstRegion: string | undefined;
+  let worstRatio = 1;
+  if (topModel?.byRegion) {
+    for (const region of topModel.byRegion) {
+      const ratio = region.demanded > 0 ? region.sold / region.demanded : 1;
+      if (ratio < worstRatio) { worstRatio = ratio; worstRegion = region.region; }
+    }
+  }
+  function cityFor(region?: string): string {
+    if (region && REGION_CITIES[region]) return pickArr(REGION_CITIES[region], 1);
+    return pickArr(Object.values(REGION_CITIES).flat(), 2);
+  }
+
+  let nameIdx = seed % REVIEWER_NAMES.length;
+  function nextName(): string { const n = REVIEWER_NAMES[nameIdx % REVIEWER_NAMES.length]; nameIdx++; return n; }
+
+  // 1. Critical recall → angry 1★ + frustrated 2★
+  if (hasCriticalRecall) {
+    const bad = modelResults.find(m => m.recallTier === "critical");
+    reviews.push({ stars: 1, reviewer: nextName(), location: cityFor(worstRegion),
+      title: "SAFETY RECALL. Never again.",
+      body: `Got a recall notice for my ${bad?.modelName ?? brandName} three weeks post-delivery. THREE WEEKS. I'm not a beta tester. My neighbor's competitor model has been flawless. This should have been caught before it left the factory.` });
+    reviews.push({ stars: 2, reviewer: nextName(), location: cityFor(),
+      title: "Giving them a chance to make it right",
+      body: `The recall shook my confidence but ${brandName}'s service center was fast about the fix. The car itself is genuinely impressive — when it works. Holding at 2 stars until I see a few more months without drama. Ask me again in Q2.` });
+  } else if (hasMajorRecall) {
+    const bad = modelResults.find(m => m.recallTier === "major");
+    reviews.push({ stars: 2, reviewer: nextName(), location: cityFor(),
+      title: "Recall notice wasn't in the brochure",
+      body: `Bought the ${bad?.modelName ?? brandName} after months of research. Recall letter two months in was not what I expected. Fixed quickly, but my trust is harder to repair. Build quality needs serious work.` });
+  }
+
+  // 2. Sold out in a region
+  if (worstRegion && worstRatio < 0.45) {
+    const regionLabel = worstRegion.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    reviews.push({ stars: 2, reviewer: nextName(), location: cityFor(worstRegion),
+      title: `Can't get a ${topModel?.modelName ?? brandName} anywhere in ${regionLabel}`,
+      body: `Tried four dealers. Six-month waitlist. Everyone I ask says ${brandName} just doesn't ship enough to ${regionLabel}. Meanwhile people on the coasts are flying past my window. Expand your distribution or lose the market here.` });
+  }
+
+  // 3. Price too high vs industry average
+  if (priceVsAvg > 1.18 && topModel) {
+    reviews.push({ stars: 2, reviewer: nextName(), location: cityFor(),
+      title: "I wanted to buy it. I really did.",
+      body: `Test drove the ${topModel.modelName} — genuinely great car. But at $${(topModel.salePrice / 1000).toFixed(0)}K when competitors are at $${(avgPrice / 1000).toFixed(0)}K? I went home, slept on it, and bought elsewhere. ${brandName}, please read the room on pricing.` });
+  }
+
+  // 4. Price significantly below average — great deal
+  if (priceVsAvg < 0.85 && topModel && sellThrough > 0.75) {
+    reviews.push({ stars: 5, reviewer: nextName(), location: cityFor(),
+      title: "Best value flying car on the market. Full stop.",
+      body: `I looked at everything in this class. Nothing touches the ${topModel.modelName} at $${(topModel.salePrice / 1000).toFixed(0)}K. My colleague paid $${(avgPrice / 1000).toFixed(0)}K for a competitor model with worse specs. ${brandName} is playing chess while everyone else plays checkers.` });
+  }
+
+  // 5. No recall, good sell-through — happy owner
+  if (!hasRecall && sellThrough > 0.8 && topModel) {
+    reviews.push({ stars: pickArr([4, 5] as const, 3), reviewer: nextName(), location: cityFor(),
+      title: pickArr(["No complaints. Seriously, none.", "My commute is now my favorite part of the day", "Exactly what I hoped for"], 1),
+      body: `${pickArr(["Eight", "Six", "Seven"], 2)} months in, zero issues with my ${topModel.modelName}. I was skeptical about a flying car this early — my wife said I was crazy — but ${brandName} clearly knows what they're doing. Handling is smooth, battery holds up, and the service app actually works. Recommended it to three coworkers already.` });
+  }
+
+  // 6. High unsold inventory — confused demand signal
+  if (sellThrough < 0.45 && totalUnsold > 300) {
+    reviews.push({ stars: 3, reviewer: nextName(), location: cityFor(),
+      title: "Walked in expecting a waitlist, walked out same day",
+      body: `Surprised to find the showroom full and dealers willing to negotiate. Not complaining — got a solid deal — but it does make you wonder why ${brandName} isn't moving more units. The car is good. Could be the price, could be awareness. Something isn't clicking at the moment.` });
+  }
+
+  // 7. Brand perception dropped
+  if (brandDelta < -3) {
+    reviews.push({ stars: 2, reviewer: nextName(), location: cityFor(),
+      title: `${brandName} is losing me`,
+      body: `Was an early believer — first-gen buyer, told all my friends. But lately ${brandName} feels off. ${hasMajorRecall ? "A recall will do that to you." : priceVsAvg > 1.1 ? "The price hikes aren't justified by the improvements." : "The excitement just isn't there anymore."} The community is noticing. Time to earn back the trust.` });
+  }
+
+  // 8. Brand perception rose significantly
+  if (brandDelta > 3 && !hasRecall) {
+    reviews.push({ stars: 5, reviewer: nextName(), location: cityFor(),
+      title: `${brandName} is having a moment and I'm here for it`,
+      body: `Whatever ${brandName} changed this year, keep doing it. Everyone in my building is talking about the ${topModel?.modelName ?? "lineup"}. Quality is up, service is sharp, and the brand feels genuinely premium now. I upgraded from my previous model with zero regrets.` });
+  }
+
+  // 9. Low market share — competitor mention
+  if (avgMarketShare < 0.12 && reviews.length < 4) {
+    reviews.push({ stars: 3, reviewer: nextName(), location: cityFor(),
+      title: "Good car. Just a smaller club than I expected.",
+      body: `The ${topModel?.modelName ?? brandName} is solid. But my neighborhood has become a showroom for every flying car on the market and I notice the ${brandName} contingent is smaller than the brochure implied. Not a dealbreaker, but ${brandName} needs to step up its game to compete.` });
+  }
+
+  // Ensure at least one positive review exists
+  if (reviews.filter(r => r.stars >= 4).length === 0) {
+    reviews.push({ stars: 4, reviewer: nextName(), location: cityFor(),
+      title: pickArr(["Solid choice", "Converted skeptic", "The future is pretty good"], 4),
+      body: `${hasRecall ? "Despite the recall drama, " : ""}My ${topModel?.modelName ?? brandName} has been a solid ride for ${pickArr(["three", "five", "seven"], 2)} months. ${priceVsAvg > 1.05 ? "Could be priced a bit better, but " : ""}Build quality is there and ${brandName}'s updates have addressed the early quirks. Not perfect, but earns its place.` });
+  }
+
+  return reviews.slice(0, 5);
+}
 
 export function RoundReport({
   gameId,
@@ -878,8 +1031,8 @@ export function RoundReport({
           </p>
 
           {/* Tabs */}
-          <div className="flex gap-1 mb-4">
-            {(["pl", "vehicles", "market"] as TabKey[]).map((tab) => (
+          <div className="flex gap-1 mb-4 flex-wrap">
+            {(["pl", "vehicles", "market", "reviews"] as TabKey[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -892,7 +1045,7 @@ export function RoundReport({
                   background: activeTab === tab ? "rgba(0,245,255,0.08)" : "transparent",
                 }}
               >
-                {tab === "pl" ? "P&L" : tab === "vehicles" ? "VEHICLES" : "MARKET"}
+                {tab === "pl" ? "P&L" : tab === "vehicles" ? "VEHICLES" : tab === "market" ? "MARKET" : "⭐ REVIEWS"}
               </button>
             ))}
           </div>
@@ -1493,6 +1646,42 @@ export function RoundReport({
               )}
             </div>
           )}
+
+          {/* Reviews Tab */}
+          {activeTab === "reviews" && (() => {
+            const reviews = generateReviews(tr, snap, brandName, roundNumber);
+            return (
+              <div className="space-y-4">
+                <p style={{ fontFamily: bodyFont, fontSize: "0.9rem", color: "var(--px-gray)" }}>
+                  A sample of what buyers — and non-buyers — are saying this year.
+                </p>
+                {reviews.map((review, i) => (
+                  <div key={i} className="border border-gray-700 p-4">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <span style={{ fontFamily: pxFont, fontSize: "0.38rem", color: "var(--px-amber)", letterSpacing: "0.1em" }}>
+                          {"★".repeat(review.stars)}{"☆".repeat(5 - review.stars)}
+                        </span>
+                        <p style={{ fontFamily: pxFont, fontSize: "0.45rem", color: "#fff", marginTop: "0.3rem" }}>
+                          {review.title}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p style={{ fontFamily: bodyFont, fontSize: "0.85rem", color: "var(--px-cyan)" }}>{review.reviewer}</p>
+                        <p style={{ fontFamily: bodyFont, fontSize: "0.8rem", color: "var(--px-gray)" }}>{review.location}</p>
+                      </div>
+                    </div>
+                    <p style={{ fontFamily: bodyFont, fontSize: "0.95rem", color: "#ccc", lineHeight: 1.5 }}>
+                      {review.body}
+                    </p>
+                  </div>
+                ))}
+                <p style={{ fontFamily: bodyFont, fontSize: "0.8rem", color: "var(--px-gray)", textAlign: "center", marginTop: "0.5rem" }}>
+                  Reviews reflect simulated buyer sentiment based on your round results.
+                </p>
+              </div>
+            );
+          })()}
         </div>
       )}
 
