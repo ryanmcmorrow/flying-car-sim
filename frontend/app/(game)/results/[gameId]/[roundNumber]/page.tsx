@@ -44,27 +44,28 @@ export default async function ResultsPage({ params }: PageProps) {
   let myRole: string | null = null;
   let rdUnlocks: string[] = [];
 
-  if (!isFacilitator) {
-    // Find team membership
-    const membership = await db.teamMember.findFirst({
-      where: { userId, team: { gameId } },
-      include: { team: true },
-    });
+  // A facilitator who has joined as a player sees the player view — no unfair advantage.
+  const playerMembership = await db.teamMember.findFirst({
+    where: { userId, team: { gameId } },
+    include: { team: true },
+  });
+  const isPlayingFacilitator = isFacilitator && playerMembership !== null;
+  const showFacilitatorView = isFacilitator && !isPlayingFacilitator;
 
-    if (!membership) {
-      redirect("/game");
-    }
+  if (!isFacilitator && !playerMembership) {
+    redirect("/game");
+  }
 
-    teamId = membership.teamId;
-    brandName = membership.team.brandName;
-    myRole = membership.role;
+  if (isFacilitator && !playerMembership && game.facilitatorId !== userId) {
+    redirect("/game");
+  }
 
+  if (playerMembership) {
+    teamId = playerMembership.teamId;
+    brandName = playerMembership.team.brandName;
+    myRole = playerMembership.role;
     const unlockRows = await db.rdUnlock.findMany({ where: { teamId }, select: { unlockKey: true } });
     rdUnlocks = unlockRows.map((r) => r.unlockKey);
-  } else {
-    if (game.facilitatorId !== userId) {
-      redirect("/game");
-    }
   }
 
   // Load round result
@@ -76,13 +77,9 @@ export default async function ResultsPage({ params }: PageProps) {
     teamResult: unknown;
   }> = [];
 
-  if (isFacilitator) {
-    const anyResult = await db.roundResult.findFirst({
-      where: { roundId: round.id },
-    });
-    if (anyResult) {
-      industrySnapshot = anyResult.industrySnapshot;
-    }
+  if (showFacilitatorView) {
+    const anyResult = await db.roundResult.findFirst({ where: { roundId: round.id } });
+    if (anyResult) industrySnapshot = anyResult.industrySnapshot;
 
     const allResults = await db.roundResult.findMany({
       where: { roundId: round.id },
@@ -130,12 +127,10 @@ export default async function ResultsPage({ params }: PageProps) {
       latestRound={game.currentRound}
       brandName={brandName ?? "FACILITATOR VIEW"}
       myRole={myRole}
-      isFacilitator={isFacilitator}
+      isFacilitator={showFacilitatorView}
       teamResult={teamResult as Record<string, unknown> | null}
       industrySnapshot={industrySnapshot as Record<string, unknown>}
-      allTeamResults={
-        isFacilitator ? allTeamResults : undefined
-      }
+      allTeamResults={showFacilitatorView ? allTeamResults : undefined}
       rdUnlocks={rdUnlocks}
     />
   );
