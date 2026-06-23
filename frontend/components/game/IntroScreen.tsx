@@ -18,7 +18,7 @@ const VEHICLE_SEGMENTS = [
   },
   {
     name: "SEDAN",
-    icon: "🚙",
+    icon: "🚘",
     tagline: "Broad-appeal bread-and-butter",
     buyers: "Families, professionals, suburban commuters",
     pricing: "Moderately price-sensitive. Buyers want value, not the cheapest option. A small premium is fine if quality justifies it.",
@@ -27,7 +27,7 @@ const VEHICLE_SEGMENTS = [
   },
   {
     name: "SUV",
-    icon: "🛻",
+    icon: "🚙",
     tagline: "Premium family hauler",
     buyers: "Affluent families, lifestyle buyers, safety-focused parents",
     pricing: "Low price sensitivity — buyers expect to pay more. You can hold firm on price without killing demand. Discounting signals cheap quality.",
@@ -36,7 +36,7 @@ const VEHICLE_SEGMENTS = [
   },
   {
     name: "TRUCK",
-    icon: "🚛",
+    icon: "🛻",
     tagline: "Utility niche, loyal buyers",
     buyers: "Tradespeople, rural buyers, outdoor enthusiasts — mostly Southeast and Midwest",
     pricing: "Very low price sensitivity — truck buyers are utility-focused and brand-loyal. Price matters less than reliability and capability.",
