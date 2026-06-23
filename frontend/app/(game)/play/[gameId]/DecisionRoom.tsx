@@ -26,6 +26,22 @@ import { YEAR1_DEMAND_BY_TYPE } from "@/lib/engine/constants";
 
 type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
+const SEGMENT_INTEL = [
+  { name: "COMPACT",    icon: "🚗", tagline: "Mass market workhorse",          color: "#39ff14", buyers: "Urban commuters, first-time buyers, budget professionals", pricing: "Price-sensitive — undercut rivals and grab share fast, but margins are thin.", tip: "High volume play. Compete hard on price, control costs." },
+  { name: "SEDAN",      icon: "🚘", tagline: "Broad-appeal bread-and-butter",  color: "#00f5ff", buyers: "Families, professionals, suburban commuters",                pricing: "Moderately price-sensitive. A small premium is fine if quality justifies it.",   tip: "Balanced segment. Reward quality with a modest price bump." },
+  { name: "SUV",        icon: "🚙", tagline: "Premium family hauler",          color: "#ffbe0b", buyers: "Affluent families, lifestyle buyers, safety-focused parents",  pricing: "Low price sensitivity — buyers expect to pay more. Discounting signals cheap.", tip: "Margin play. Don't race to the bottom — hold your price." },
+  { name: "TRUCK",      icon: "🛻", tagline: "Utility niche, loyal buyers",    color: "#ff7c00", buyers: "Tradespeople, rural buyers — mostly Southeast and Midwest",    pricing: "Very low price sensitivity — utility-focused, brand-loyal buyers.",             tip: "Niche but sticky. Strong in rural regions. R&D on durability wins." },
+  { name: "SPORTS CAR", icon: "🏎️", tagline: "Prestige — status over savings", color: "#ff006e", buyers: "Wealthy early adopters, status buyers, tech enthusiasts",      pricing: "Price is a signal of exclusivity. Charging more can increase demand.",           tip: "Prestige play. Invest in R&D and brand perception over raw volume." },
+];
+
+const REGION_INTEL = [
+  { name: "WEST COAST",  icon: "🌴", color: "#00f5ff", strongest: "COMPACT, SEDAN, SPORTS CAR", note: "Largest market in Year 1. Buyers embrace new tech and pay premium for innovation." },
+  { name: "NORTHEAST",   icon: "🏙️", color: "#c77dff", strongest: "COMPACT, SEDAN",              note: "Dense urban, wealthy commuters. Responds well to brand prestige." },
+  { name: "SOUTHEAST",   icon: "🌿", color: "#39ff14", strongest: "TRUCK, SUV",                  note: "Truck demand far above national average. Practical, brand-loyal buyers. Underserved." },
+  { name: "MIDWEST",     icon: "🌾", color: "#ffbe0b", strongest: "SEDAN, SUV, TRUCK",           note: "Balanced demand. Build here and skip the $1,500/unit shipping penalty." },
+  { name: "SOUTHWEST",   icon: "🏜️", color: "#ff7c00", strongest: "SUV, SEDAN",                  note: "Smaller today but growing fastest. Early movers build installed base before rivals." },
+];
+
 interface DecisionRoomProps {
   gameId: string;
   game: { id: string; code: string; currentRound: number; status: string; mode: string };
@@ -158,6 +174,7 @@ export function DecisionRoom({
     return () => clearInterval(t);
   }, [round.expiresAt, secondsLeft]);
 
+  const [briefOpen, setBriefOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
 
@@ -317,6 +334,61 @@ export function DecisionRoom({
         </div>
       )}
 
+      {/* Market Brief modal */}
+      {briefOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 100, overflowY: "auto", padding: "2rem 1rem" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setBriefOpen(false); }}
+        >
+          <div style={{ maxWidth: "720px", margin: "0 auto" }}>
+            <div className="pixel-card" style={{ marginBottom: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h2 style={{ fontFamily: "var(--font-pixel)", fontSize: "0.75rem", color: "var(--px-cyan)" }}>📋 MARKET INTELLIGENCE BRIEF</h2>
+                <button onClick={() => setBriefOpen(false)} style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "var(--px-pink)", border: "2px solid var(--px-pink)", background: "transparent", padding: "0.2rem 0.5rem", cursor: "pointer" }}>✕ CLOSE</button>
+              </div>
+            </div>
+
+            <h3 style={{ fontFamily: "var(--font-pixel)", fontSize: "0.55rem", color: "var(--px-amber)", marginBottom: "0.75rem" }}>VEHICLE SEGMENTS</h3>
+            <div style={{ display: "grid", gap: "0.75rem", marginBottom: "1.5rem" }}>
+              {SEGMENT_INTEL.map((seg) => (
+                <div key={seg.name} className="pixel-card" style={{ borderColor: seg.color }}>
+                  <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
+                    <span style={{ fontSize: "1.8rem" }}>{seg.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", gap: "0.75rem", alignItems: "baseline", marginBottom: "0.3rem" }}>
+                        <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: seg.color }}>{seg.name}</span>
+                        <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-gray)" }}>{seg.tagline}</span>
+                      </div>
+                      <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "#cccccc", marginBottom: "0.3rem" }}><span style={{ color: "var(--px-gray)" }}>Buyers: </span>{seg.buyers}</p>
+                      <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "#cccccc", marginBottom: "0.3rem" }}><span style={{ color: "var(--px-gray)" }}>Pricing: </span>{seg.pricing}</p>
+                      <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-amber)" }}>💡 {seg.tip}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <h3 style={{ fontFamily: "var(--font-pixel)", fontSize: "0.55rem", color: "var(--px-amber)", marginBottom: "0.75rem" }}>REGIONS</h3>
+            <div style={{ display: "grid", gap: "0.75rem", marginBottom: "1.5rem" }}>
+              {REGION_INTEL.map((reg) => (
+                <div key={reg.name} className="pixel-card" style={{ borderColor: reg.color }}>
+                  <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
+                    <span style={{ fontSize: "1.8rem" }}>{reg.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", gap: "0.75rem", alignItems: "baseline", marginBottom: "0.3rem" }}>
+                        <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: reg.color }}>{reg.name}</span>
+                        <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-gray)" }}>Best for: {reg.strongest}</span>
+                      </div>
+                      <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "#cccccc" }}>{reg.note}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
         <div className="pixel-card">
@@ -359,6 +431,20 @@ export function DecisionRoom({
                   ${parseFloat(team.cash).toLocaleString()}
                 </p>
               </div>
+              <button
+                onClick={() => setBriefOpen(true)}
+                style={{
+                  fontFamily: "var(--font-pixel)",
+                  fontSize: "0.38rem",
+                  color: "var(--px-cyan)",
+                  border: "2px solid var(--px-cyan)",
+                  background: "transparent",
+                  padding: "0.2rem 0.5rem",
+                  cursor: "pointer",
+                }}
+              >
+                📋 MARKET BRIEF
+              </button>
               {round.roundNumber > 1 && (
                 <a
                   href={`/results/${gameId}/${round.roundNumber - 1}`}
