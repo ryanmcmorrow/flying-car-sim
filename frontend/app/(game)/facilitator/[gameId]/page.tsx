@@ -46,6 +46,7 @@ export default async function FacilitatorGameLobbyPage({ params }: Props) {
       id: t.id,
       brandName: t.brandName,
       cash: t.cash.toString(),
+      aiDifficulty: t.aiDifficulty ?? null,
       members: t.members.map((m) => ({
         id: m.id,
         role: m.role as string,

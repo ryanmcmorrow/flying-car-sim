@@ -61,6 +61,7 @@ export async function GET(
       id: t.id,
       brandName: t.brandName,
       cash: t.cash.toString(),
+      aiDifficulty: t.aiDifficulty ?? null,
       createdAt: t.createdAt.toISOString(),
       members: t.members.map((m) => ({
         id: m.id,

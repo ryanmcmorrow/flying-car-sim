@@ -23,6 +23,7 @@ interface Team {
   id: string;
   brandName: string;
   cash: string;
+  aiDifficulty: string | null;
   members: TeamMember[];
 }
 
@@ -65,6 +66,12 @@ export function FacilitatorLobbyClient({ game: initialGame, myUserId }: Props) {
   const [justResolved, setJustResolved] = useState<number | null>(null);
   const [kicking, setKicking] = useState<string | null>(null);
 
+  // AI team state
+  const [aiBrand, setAiBrand] = useState("");
+  const [aiDiff, setAiDiff] = useState<"EASY" | "MEDIUM" | "HARD">("MEDIUM");
+  const [addingAi, setAddingAi] = useState(false);
+  const [aiError, setAiError] = useState("");
+
   // Facilitator-as-player join state (classroom mode)
   const [joinBrand, setJoinBrand] = useState("");
   const [joinRole, setJoinRole] = useState<string>("CEO");
@@ -95,6 +102,26 @@ export function FacilitatorLobbyClient({ game: initialGame, myUserId }: Props) {
     }
   }
 
+  async function handleAddAiTeam() {
+    setAiError("");
+    setAddingAi(true);
+    try {
+      const res = await fetch(`/api/games/${game.id}/ai-team`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandName: aiBrand, difficulty: aiDiff }),
+      });
+      const body = await parseJSON(res);
+      if (!res.ok) { setAiError(body.error as string ?? `HTTP ${res.status}`); return; }
+      setAiBrand("");
+      await refreshGame();
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setAddingAi(false);
+    }
+  }
+
   async function handleKick(teamId: string) {
     setKicking(teamId);
     try {
@@ -105,8 +132,9 @@ export function FacilitatorLobbyClient({ game: initialGame, myUserId }: Props) {
     }
   }
 
+  // AI teams self-submit; only human teams need a CEO
   const hasCEO = game.teams.some((t) =>
-    t.members.some((m) => m.role === "CEO")
+    t.aiDifficulty !== null || t.members.some((m) => m.role === "CEO")
   );
 
   const currentRoundData = game.rounds.find(
@@ -154,6 +182,10 @@ export function FacilitatorLobbyClient({ game: initialGame, myUserId }: Props) {
     setResolving(true);
     const roundBeingResolved = game.currentRound;
     try {
+      // Auto-fill any AI team decisions before resolving
+      if (game.teams.some((t) => t.aiDifficulty !== null)) {
+        await fetch(`/api/games/${game.id}/ai-fill`, { method: "POST" });
+      }
       const res = await fetch(`/api/games/${game.id}/resolve`, { method: "POST" });
       const body = await parseJSON(res);
       if (!res.ok) { setResolveError(body.error as string ?? `HTTP ${res.status}`); return; }
@@ -314,6 +346,62 @@ export function FacilitatorLobbyClient({ game: initialGame, myUserId }: Props) {
               style={{ fontSize: "0.5rem" }}
             >
               {joining ? "JOINING..." : "⚡ JOIN & PLAY"}
+            </button>
+          </div>
+        )}
+
+        {/* Add AI team (lobby only) */}
+        {game.status === "LOBBY" && (
+          <div className="pixel-card mb-6" style={{ borderColor: "#c77dff", boxShadow: "4px 4px 0 #2d0060" }}>
+            <p style={{ fontFamily: pxFont, fontSize: "0.55rem", color: "#c77dff", marginBottom: "0.25rem" }}>
+              🤖 ADD AI TEAM
+            </p>
+            <p style={{ fontFamily: bodyFont, fontSize: "0.9rem", color: "#888899", marginBottom: "1rem" }}>
+              AI teams play automatically each round. Great for playtesting or filling empty seats.
+            </p>
+            {aiError && (
+              <div className="mb-3" style={{ border: "2px solid #ff006e", background: "#1a000d", padding: "0.5rem", fontFamily: pxFont, fontSize: "0.45rem", color: "#ff006e" }}>
+                ❌ {aiError}
+              </div>
+            )}
+            <div className="flex gap-4 flex-wrap mb-4">
+              <div style={{ flex: 1, minWidth: "160px" }}>
+                <label className="pixel-label mb-1 block">Brand name</label>
+                <input
+                  type="text"
+                  value={aiBrand}
+                  onChange={(e) => setAiBrand(e.target.value)}
+                  placeholder="e.g. ROBO MOTORS"
+                  maxLength={30}
+                  className="pixel-input w-full"
+                />
+              </div>
+              <div>
+                <label className="pixel-label mb-1 block">Difficulty</label>
+                <div className="flex gap-2">
+                  {(["EASY", "MEDIUM", "HARD"] as const).map((d) => {
+                    const colors = { EASY: "#39ff14", MEDIUM: "#ffbe0b", HARD: "#ff006e" };
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setAiDiff(d)}
+                        style={{ border: "2px solid", borderColor: aiDiff === d ? colors[d] : "#8888aa", background: aiDiff === d ? `${colors[d]}22` : "#0a0a1a", padding: "0.4rem 0.75rem", cursor: "pointer", fontFamily: pxFont, fontSize: "0.42rem", color: aiDiff === d ? colors[d] : "#888899" }}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleAddAiTeam}
+              disabled={addingAi || aiBrand.trim().length < 2}
+              className="pixel-btn"
+              style={{ fontSize: "0.5rem", borderColor: "#c77dff", color: "#c77dff" }}
+            >
+              {addingAi ? "ADDING..." : "🤖 ADD AI TEAM"}
             </button>
           </div>
         )}
@@ -525,20 +613,28 @@ export function FacilitatorLobbyClient({ game: initialGame, myUserId }: Props) {
           ) : (
             <div className="space-y-4">
               {game.teams.map((team) => {
-                const hasCEOOnTeam = team.members.some((m) => m.role === "CEO");
+                const isAi = team.aiDifficulty !== null;
+                const hasCEOOnTeam = isAi || team.members.some((m) => m.role === "CEO");
+                const diffColors: Record<string, string> = { EASY: "#39ff14", MEDIUM: "#ffbe0b", HARD: "#ff006e" };
+                const borderColor = isAi ? (diffColors[team.aiDifficulty!] ?? "#c77dff") : hasCEOOnTeam ? "#39ff14" : "#ffbe0b";
                 return (
                   <div
                     key={team.id}
                     className="pixel-card"
-                    style={{ borderColor: hasCEOOnTeam ? "#39ff14" : "#ffbe0b", boxShadow: `4px 4px 0 ${hasCEOOnTeam ? "#1d8009" : "#7d5d00"}` }}
+                    style={{ borderColor, boxShadow: `4px 4px 0 ${isAi ? "#2d0060" : hasCEOOnTeam ? "#1d8009" : "#7d5d00"}` }}
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <div>
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="pixel-heading" style={{ fontSize: "0.75rem", color: "#ffffff" }}>
                           {team.brandName}
                         </span>
+                        {isAi && (
+                          <span style={{ fontFamily: pxFont, fontSize: "0.38rem", color: diffColors[team.aiDifficulty!] ?? "#c77dff", border: `2px solid ${diffColors[team.aiDifficulty!] ?? "#c77dff"}`, padding: "0.1rem 0.4rem" }}>
+                            🤖 {team.aiDifficulty}
+                          </span>
+                        )}
                         {!hasCEOOnTeam && (
-                          <span style={{ fontFamily: pxFont, fontSize: "0.4rem", color: "#ff006e", marginLeft: "0.75rem" }}>
+                          <span style={{ fontFamily: pxFont, fontSize: "0.4rem", color: "#ff006e" }}>
                             ⚠ NO CEO
                           </span>
                         )}
@@ -565,10 +661,16 @@ export function FacilitatorLobbyClient({ game: initialGame, myUserId }: Props) {
                       </div>
                     </div>
 
-                    <RoleSlots
-                      filledRoles={team.members.map((m) => ({ role: m.role as TeamMemberRole, userName: m.userName }))}
-                      interactive={false}
-                    />
+                    {isAi ? (
+                      <p style={{ fontFamily: bodyFont, fontSize: "0.9rem", color: "#888899" }}>
+                        Decisions auto-generated each round at {team.aiDifficulty} difficulty.
+                      </p>
+                    ) : (
+                      <RoleSlots
+                        filledRoles={team.members.map((m) => ({ role: m.role as TeamMemberRole, userName: m.userName }))}
+                        interactive={false}
+                      />
+                    )}
                   </div>
                 );
               })}
