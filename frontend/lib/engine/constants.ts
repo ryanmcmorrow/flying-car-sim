@@ -20,9 +20,9 @@ export const VEHICLE_TYPES = [
 export type VehicleType = (typeof VEHICLE_TYPES)[number];
 
 // ── Year 1 initial demand ──────────────────────────────────────────────────────
-export const YEAR1_TOTAL_FLYING = 300_000;
+export const YEAR1_TOTAL_FLYING = 60_000;
 export const YEAR1_TOTAL_TRADITIONAL = 18_000_000;
-export const YEAR1_TOTAL_VEHICLE_MARKET = 18_300_000;
+export const YEAR1_TOTAL_VEHICLE_MARKET = 18_060_000;
 export const VEHICLE_MARKET_GROWTH_RATE = 0.008;
 
 export const YEAR1_DEMAND_BY_TYPE_BY_REGION: Record<
@@ -30,48 +30,48 @@ export const YEAR1_DEMAND_BY_TYPE_BY_REGION: Record<
   Record<Region, number>
 > = {
   COMPACT: {
-    WEST_COAST: 27300,
-    NORTHEAST: 26400,
-    SOUTHEAST: 14520,
-    MIDWEST: 11880,
-    SOUTHWEST: 10080,
+    WEST_COAST: 5460,
+    NORTHEAST: 5280,
+    SOUTHEAST: 2904,
+    MIDWEST: 2376,
+    SOUTHWEST: 2016,
   },
   SEDAN: {
-    WEST_COAST: 21840,
-    NORTHEAST: 19800,
-    SOUTHEAST: 16500,
-    MIDWEST: 15120,
-    SOUTHWEST: 9000,
+    WEST_COAST: 4368,
+    NORTHEAST: 3960,
+    SOUTHEAST: 3300,
+    MIDWEST: 3024,
+    SOUTHWEST: 1800,
   },
   SUV: {
-    WEST_COAST: 15600,
-    NORTHEAST: 11880,
-    SOUTHEAST: 16500,
-    MIDWEST: 15120,
-    SOUTHWEST: 9000,
+    WEST_COAST: 3120,
+    NORTHEAST: 2376,
+    SOUTHEAST: 3300,
+    MIDWEST: 3024,
+    SOUTHWEST: 1800,
   },
   SPORTS_CAR: {
-    WEST_COAST: 10920,
-    NORTHEAST: 6600,
-    SOUTHEAST: 5280,
-    MIDWEST: 4320,
-    SOUTHWEST: 4320,
+    WEST_COAST: 2184,
+    NORTHEAST: 1320,
+    SOUTHEAST: 1056,
+    MIDWEST:    864,
+    SOUTHWEST:  864,
   },
   TRUCK: {
-    WEST_COAST: 2340,
-    NORTHEAST: 1320,
-    SOUTHEAST: 13200,
-    MIDWEST: 7560,
-    SOUTHWEST: 3600,
+    WEST_COAST:  468,
+    NORTHEAST:   264,
+    SOUTHEAST:  2640,
+    MIDWEST:    1512,
+    SOUTHWEST:   720,
   },
 };
 
 export const YEAR1_DEMAND_BY_TYPE: Record<VehicleType, number> = {
-  COMPACT: 90180,
-  SEDAN: 82260,
-  SUV: 68100,
-  SPORTS_CAR: 31440,
-  TRUCK: 28020,
+  COMPACT:    18036,
+  SEDAN:      16452,
+  SUV:        13620,
+  SPORTS_CAR:  6288,
+  TRUCK:       5604,
 };
 
 // ── Type growth modifiers by round bracket ────────────────────────────────────
