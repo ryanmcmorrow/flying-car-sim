@@ -93,7 +93,7 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
       });
       const body = await parseJSON(res);
       if (!res.ok) { setJoinError(body.error as string ?? `HTTP ${res.status}`); return; }
-      router.push(`/lobby/${newGameId}`);
+      router.push(`/facilitator/${newGameId}`);
     } catch (err) {
       setJoinError(err instanceof Error ? err.message : "Network error");
     } finally {
