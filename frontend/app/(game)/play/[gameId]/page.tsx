@@ -230,9 +230,12 @@ export default async function PlayPage({ params, searchParams }: PageProps) {
     currentFacilities = [{ region: "MIDWEST", size: (rawFacilities as { size: string }).size }];
   }
 
+  const isFacilitator = session.user.role === "FACILITATOR" && game.facilitatorId === session.user.id;
+
   return (
     <DecisionRoom
       gameId={gameId}
+      isFacilitator={isFacilitator}
       game={{
         id: game.id,
         code: game.code,

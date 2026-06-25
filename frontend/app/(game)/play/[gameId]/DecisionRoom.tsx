@@ -44,6 +44,7 @@ const REGION_INTEL = [
 
 interface DecisionRoomProps {
   gameId: string;
+  isFacilitator?: boolean;
   game: { id: string; code: string; currentRound: number; status: string; mode: string };
   round: {
     id: string;
@@ -95,6 +96,7 @@ const ROLE_EDITABLE: Record<TeamMemberRole, SectionKey[]> = {
 
 export function DecisionRoom({
   gameId,
+  isFacilitator = false,
   game,
   round,
   team,
@@ -431,6 +433,14 @@ export function DecisionRoom({
                   ${parseFloat(team.cash).toLocaleString()}
                 </p>
               </div>
+              {isFacilitator && (
+                <a
+                  href={`/facilitator/${gameId}`}
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: "0.38rem", color: "var(--px-pink)", border: "2px solid var(--px-pink)", padding: "0.2rem 0.5rem", textDecoration: "none" }}
+                >
+                  ⚙ FACILITATOR
+                </a>
+              )}
               <button
                 onClick={() => setBriefOpen(true)}
                 style={{
