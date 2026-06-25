@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { TeamMemberRole } from "@/app/generated/prisma/client";
 import type {
@@ -22,7 +22,8 @@ import { MarketingSection as MarketingSectionComp } from "@/components/game/sect
 import { LobbyingSection as LobbyingSectionComp } from "@/components/game/sections/LobbyingSection";
 import { ReadOnlySection } from "@/components/game/sections/ReadOnlySection";
 import { SubmitPanel } from "@/components/game/SubmitPanel";
-import { YEAR1_DEMAND_BY_TYPE } from "@/lib/engine/constants";
+import { YEAR1_DEMAND_BY_TYPE, SPACE_COSTS, RD_RECURRING_COSTS, TECH_TREE_COSTS } from "@/lib/engine/constants";
+import { computeModelUnitCost, computeEngineeringFee } from "@/lib/decision-utils";
 
 type SaveStatus = "saved" | "saving" | "unsaved" | "error";
 
@@ -177,6 +178,51 @@ export function DecisionRoom({
   }, [round.expiresAt, secondsLeft]);
 
   const [briefOpen, setBriefOpen] = useState(false);
+
+  const estimatedSpend = useMemo(() => {
+    let total = 0;
+    // Existing facility maintenance
+    for (const f of currentFacilities) {
+      total += SPACE_COSTS[f.size as "small" | "medium" | "large"]?.maintenance ?? 0;
+    }
+    // New facility purchases
+    const ownedKeys = new Set(currentFacilities.map(f => `${f.region}::${f.size}`));
+    for (const f of manufacturingSection.newFacilities ?? []) {
+      if (!ownedKeys.has(`${f.region}::${f.size}`)) {
+        total += SPACE_COSTS[f.size as "small" | "medium" | "large"]?.buyPrice ?? 0;
+      }
+    }
+    // R&D recurring subscriptions
+    for (const [key, enabled] of Object.entries(rdSection.recurring)) {
+      if (enabled) total += RD_RECURRING_COSTS[key] ?? 0;
+    }
+    // R&D tech tree (new unlocks only)
+    for (const key of rdSection.techTreeUnlocks) {
+      if (!rdUnlocks.includes(key)) total += TECH_TREE_COSTS[key] ?? 0;
+    }
+    // Market intel (new purchases only)
+    for (const key of rdSection.intelPurchases ?? []) {
+      if (!rdUnlocks.includes(key)) total += 2_000_000;
+    }
+    // Engineering fees for new vehicle designs
+    for (const model of vehicleSection.models) {
+      if (model.isNewDesign) total += computeEngineeringFee(model.vehicleType);
+    }
+    // Production COGS
+    for (const run of manufacturingSection.productionRuns ?? []) {
+      const model = vehicleSection.models.find(m => m.id === run.modelId);
+      if (model && run.units > 0) total += run.units * computeModelUnitCost(model);
+    }
+    // Marketing budget
+    total += marketingSection.totalBudget;
+    // Lobbying spend
+    total += lobbyingSection.lobbyingSpend;
+    return total;
+  }, [currentFacilities, manufacturingSection, rdSection, rdUnlocks, vehicleSection, marketingSection, lobbyingSection]);
+
+  const startingCash = parseFloat(team.cash);
+  const remainingCash = startingCash - estimatedSpend;
+
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
 
@@ -428,10 +474,20 @@ export function DecisionRoom({
             )}
             <div className="text-right flex flex-col items-end gap-2">
               <div>
-                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", color: "var(--px-gray)" }}>Cash balance</p>
-                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.75rem", color: "var(--px-green)" }}>
-                  ${parseFloat(team.cash).toLocaleString()}
+                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.38rem", color: "var(--px-gray)" }}>Cash in bank</p>
+                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.6rem", color: "var(--px-green)" }}>
+                  ${startingCash.toLocaleString()}
                 </p>
+                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.38rem", color: "var(--px-gray)", marginTop: "0.15rem" }}>Est. spend</p>
+                <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.55rem", color: "var(--px-amber)" }}>
+                  −${estimatedSpend.toLocaleString()}
+                </p>
+                <div style={{ borderTop: "1px solid var(--px-gray)", marginTop: "0.2rem", paddingTop: "0.2rem" }}>
+                  <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.38rem", color: "var(--px-gray)" }}>After round</p>
+                  <p style={{ fontFamily: "var(--font-pixel)", fontSize: "0.75rem", color: remainingCash < 0 ? "var(--px-pink)" : "var(--px-cyan)" }}>
+                    ${remainingCash.toLocaleString()}
+                  </p>
+                </div>
               </div>
               {isFacilitator && (
                 <a
