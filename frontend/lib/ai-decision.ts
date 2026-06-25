@@ -33,17 +33,17 @@ export interface AiDecisionOutput {
 // ── Cost helpers ──────────────────────────────────────────────────────────────
 
 const BASE_COSTS: Record<string, number> = {
-  COMPACT: 72_000, SEDAN: 88_000, SUV: 115_000, TRUCK: 120_000, SPORTS_CAR: 155_000,
+  COMPACT: 23_000, SEDAN: 28_000, SUV: 35_000, TRUCK: 47_000, SPORTS_CAR: 88_000,
 };
 const ENGINE_ADDERS: Record<string, number> = {
-  high_performance: 12_000, reliable: 5_000, cheap: 0,
+  high_performance: 6_000, reliable: 2_500, cheap: 0,
 };
 const INTERNALS_ADDERS: Record<string, number> = {
-  triple_tested: 8_000, mass_produced: 2_000, low_grade: 0,
+  triple_tested: 4_000, mass_produced: 1_000, low_grade: 0,
 };
 const FEATURE_ADDERS: Record<string, number> = {
-  touchscreen: 2_000, lane_assist: 3_000, cameras: 2_000, speakers: 1_500,
-  leather: 4_000, phone_integration: 2_500, virtual_assistant: 5_000, entertainment: 3_000,
+  touchscreen: 1_200, lane_assist: 1_800, cameras: 1_000, speakers: 800,
+  leather: 2_000, phone_integration: 1_200, virtual_assistant: 3_000, entertainment: 1_500,
 };
 
 function unitCost(model: Omit<VehicleModel, "id" | "name" | "isNewDesign">): number {
