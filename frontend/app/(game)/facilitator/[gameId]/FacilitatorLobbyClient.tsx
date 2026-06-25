@@ -471,7 +471,7 @@ export function FacilitatorLobbyClient({ game: initialGame, myUserId }: Props) {
                 {isAlreadyPlayer && (
                   <div>
                     <a
-                      href={`/play/${game.id}`}
+                      href={`/lobby/${game.id}`}
                       className="pixel-btn pixel-btn-green"
                       style={{ fontSize: "0.5rem", display: "inline-block" }}
                     >
