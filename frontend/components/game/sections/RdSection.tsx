@@ -44,10 +44,10 @@ const RECURRING_OPTIONS: {
   },
   {
     key: "marketResearch",
-    label: "Market Research",
+    label: "Regional Demand Signals",
     cost: "$1.5M/yr",
-    effect: "Reveal demand signals in a region",
-    detail: "In Results, you'll see a qualitative demand breakdown by vehicle type for your chosen region — where is demand strongest?",
+    effect: "Soft demand signals for one region/yr",
+    detail: "Each round in Results, you'll see a qualitative HIGH / MEDIUM / LOW demand breakdown by vehicle type for your chosen region. Renew each year. For exact numbers, use Market Intelligence (one-time unlocks below).",
     needsTarget: "region",
   },
 ];
@@ -115,7 +115,7 @@ function MarketIntelSection({
   return (
     <div>
       <h2 className="pixel-heading mb-1" style={{ fontSize: "0.65rem", color: "var(--px-amber)" }}>
-        Market Intelligence <Tooltip text="One-time subscriptions that permanently reveal demand data in your results. Region intel shows demand for all vehicle types in that region. Type intel shows total demand for that vehicle type across all regions. Requires: Market Analytics tech unlock. $2M each." />
+        Market Intelligence — Exact Numbers <Tooltip text="One-time $2M purchases that permanently unlock precise demand figures in Results (not qualitative signals — real numbers). Region intel: exact demand by vehicle type for one region. Type intel: exact total demand for one vehicle type across all regions. Requires Market Analytics tech unlock. Pay once, revealed forever." />
       </h2>
       {!hasAnalytics ? (
         <div className="pixel-card" style={{ borderColor: "var(--px-gray)", padding: "0.75rem" }}>
