@@ -60,22 +60,22 @@ export function getEmptyLobbyingSection(): LobbyingSection {
 // ── Vehicle Cost Computations ────────────────────────────────────────────────
 
 const BASE_COSTS: Record<string, number> = {
-  COMPACT: 42000,
-  SEDAN: 52000,
-  SUV: 68000,
-  TRUCK: 72000,
-  SPORTS_CAR: 85000,
+  COMPACT: 18000,
+  SEDAN: 23000,
+  SUV: 30000,
+  TRUCK: 32000,
+  SPORTS_CAR: 38000,
 };
 
 const ENGINE_ADDERS: Record<string, number> = {
-  high_performance: 9000,
-  reliable: 3500,
+  high_performance: 4000,
+  reliable: 1500,
   cheap: 0,
 };
 
 const INTERNALS_ADDERS: Record<string, number> = {
-  triple_tested: 5500,
-  mass_produced: 1200,
+  triple_tested: 2500,
+  mass_produced: 500,
   low_grade: 0,
 };
 

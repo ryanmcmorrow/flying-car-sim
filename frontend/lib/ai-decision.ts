@@ -33,13 +33,13 @@ export interface AiDecisionOutput {
 // ── Cost helpers ──────────────────────────────────────────────────────────────
 
 const BASE_COSTS: Record<string, number> = {
-  COMPACT: 42_000, SEDAN: 52_000, SUV: 68_000, TRUCK: 72_000, SPORTS_CAR: 85_000,
+  COMPACT: 18_000, SEDAN: 23_000, SUV: 30_000, TRUCK: 32_000, SPORTS_CAR: 38_000,
 };
 const ENGINE_ADDERS: Record<string, number> = {
-  high_performance: 9_000, reliable: 3_500, cheap: 0,
+  high_performance: 4_000, reliable: 1_500, cheap: 0,
 };
 const INTERNALS_ADDERS: Record<string, number> = {
-  triple_tested: 5_500, mass_produced: 1_200, low_grade: 0,
+  triple_tested: 2_500, mass_produced: 500, low_grade: 0,
 };
 const FEATURE_ADDERS: Record<string, number> = {
   touchscreen: 800, lane_assist: 1_200, cameras: 700, speakers: 600,
