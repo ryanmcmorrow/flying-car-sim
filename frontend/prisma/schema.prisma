@@ -97,8 +97,8 @@ model Team {
   gameId       String
   game         Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
   brandName    String   @db.VarChar(30)
-  /// Starting cash: $500,000,000
-  cash         Decimal  @default(500000000) @db.Decimal(18, 2)
+  /// Starting cash: $300,000,000
+  cash         Decimal  @default(300000000) @db.Decimal(18, 2)
   createdAt    DateTime @default(now())
   /// "EASY" | "MEDIUM" | "HARD" for AI-controlled teams; null for human teams
   aiDifficulty String?

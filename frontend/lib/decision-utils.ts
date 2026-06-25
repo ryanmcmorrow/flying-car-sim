@@ -59,35 +59,37 @@ export function getEmptyLobbyingSection(): LobbyingSection {
 
 // ── Vehicle Cost Computations ────────────────────────────────────────────────
 
+// Target: 8-15% gross margin at natural flying-car sale prices ($80-175K).
+// COMPACT at $72K COGS → ~12% margin at $82K sale price.
 const BASE_COSTS: Record<string, number> = {
-  COMPACT: 18000,
-  SEDAN: 23000,
-  SUV: 30000,
-  TRUCK: 32000,
-  SPORTS_CAR: 38000,
+  COMPACT:    72_000,
+  SEDAN:      88_000,
+  SUV:       115_000,
+  TRUCK:     120_000,
+  SPORTS_CAR:155_000,
 };
 
 const ENGINE_ADDERS: Record<string, number> = {
-  high_performance: 4000,
-  reliable: 1500,
-  cheap: 0,
+  high_performance: 12_000,
+  reliable:          5_000,
+  cheap:                 0,
 };
 
 const INTERNALS_ADDERS: Record<string, number> = {
-  triple_tested: 2500,
-  mass_produced: 500,
-  low_grade: 0,
+  triple_tested:  8_000,
+  mass_produced:  2_000,
+  low_grade:          0,
 };
 
 const FEATURE_COSTS: Record<string, number> = {
-  touchscreen:       800,   // +1.2% demand  → 1.5% per $1K
-  lane_assist:       1_200, // +2.0% demand  → 1.7% per $1K
-  cameras:           700,   // +1.0% demand  → 1.4% per $1K
-  speakers:          600,   // +1.0% demand  → 1.7% per $1K
-  leather:           1_500, // +2.2% demand  → 1.5% per $1K
-  phone_integration: 1_000, // +1.4% demand  → 1.4% per $1K
-  virtual_assistant: 2_000, // +2.5% demand  → 1.25% per $1K
-  entertainment:     1_300, // +1.8% demand  → 1.4% per $1K
+  touchscreen:       2_000,
+  lane_assist:       3_000,
+  cameras:           2_000,
+  speakers:          1_500,
+  leather:           4_000,
+  phone_integration: 2_500,
+  virtual_assistant: 5_000,
+  entertainment:     3_000,
 };
 
 const ENGINEERING_FEES: Record<string, number> = {

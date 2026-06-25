@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Team" ALTER COLUMN "cash" SET DEFAULT 300000000;
