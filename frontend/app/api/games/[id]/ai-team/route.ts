@@ -36,9 +36,13 @@ export async function POST(
     return NextResponse.json({ error: "Brand name already taken" }, { status: 409 });
   }
 
-  const team = await db.team.create({
-    data: { gameId: id, brandName: cleanName, aiDifficulty: difficulty },
-  });
-
-  return NextResponse.json({ teamId: team.id }, { status: 201 });
+  try {
+    const team = await db.team.create({
+      data: { gameId: id, brandName: cleanName, aiDifficulty: difficulty },
+    });
+    return NextResponse.json({ teamId: team.id }, { status: 201 });
+  } catch (err) {
+    console.error("[ai-team] db.team.create failed:", err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }
