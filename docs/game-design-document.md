@@ -354,15 +354,17 @@ R&D has two categories: **recurring investments** (buy each year for incremental
 |---|---|---|
 | Improve marketing effectiveness | $3M | +20% on next year's marketing spend dollar efficiency (stackable) |
 | Improve part dependability | $5M | Reliability score ↑; existing fleet -20% recall risk (stackable) |
-| Pricing research | $1M | Reveals all competitors' average sale prices this round |
-| Competitor research | $2M | Reveals one competitor's production volume and vehicle type this round |
-| Market research | $1.5M | Reveals next year's demand forecast per region (accuracy enhanced by Market Analytics Platform unlock) |
+| Pricing research | $1M | In results: market-clearing price per model × region (see §6.6); choose which segment to spy on |
+| Competitor research | $2M | In results: tracked rival's brand score, market share, price/units built/units sold per model; choose which rival to track |
+| Market research | $1.5M | In results: exact regional demand by segment for the round just resolved; choose which region to reveal |
 
 ---
 
 #### R&D Tech Tree
 
 The tech tree contains **one-time permanent unlocks** organized into four tiers. Prerequisites must be purchased in prior rounds (not the same round). Each unlock is exclusive for a window after first investment (see Section 11.4).
+
+**One unlock per tree per round:** In any single round a team may unlock at most one node per tree (Manufacturing, Aerodynamics/Performance, Power/Green Tech, Market/Intelligence). A team can unlock one node from each of the four trees in the same round — it cannot unlock two nodes from the same tree in one round. Prerequisite chains must be satisfied from already-owned unlocks, not from unlocks purchased in the same round.
 
 Teams do not see the full tech tree at game start — the menu reveals available unlocks and their immediate prerequisites, but not deeper tiers. This creates an exploration dynamic: early R&D investment opens the picture.
 
@@ -557,6 +559,34 @@ Not all marketing channels work equally well for every vehicle type. Sports cars
 | Paid Search | 1.2× | 1.1× | 1.0× | 1.0× | 0.5× |
 
 Sports car brands are built through prestige media (TV, print). Paid search is nearly useless — enthusiast buyers aren't Googling deals. Trucks respond well to radio (working buyers). Compacts benefit most from search (price-comparison shoppers).
+
+### 6.5 Absolute Demand Price Curves
+
+Beyond relative price elasticity (which affects your share of a fixed market), the **industry-average price** for each vehicle type also shifts the total size of that market. If the whole industry charges gouging prices, the market itself shrinks; if prices are bargain-tier, there is a small demand boost but diminishing returns prevent a race to zero from inflating units infinitely.
+
+**Price bands by type** (below band = up to +15% demand boost; inside band = neutral; above band = linear decay toward 0.25× floor):
+
+| Type | Low Band | High Band |
+|---|---|---|
+| Compact | $60,000 | $110,000 |
+| Sedan | $75,000 | $140,000 |
+| SUV | $95,000 | $175,000 |
+| Truck | $85,000 | $160,000 |
+| Sports Car | $110,000 | $270,000 |
+
+The Sports Car band is deliberately wide — prestige pricing is expected and accepted. Compacts have the tightest ceiling because that segment is the most price-aware.
+
+The market-pool multiplier is computed from the **units-weighted industry average price** across all teams selling in that type. A single premium outlier barely moves the needle; collective industry price gouging shrinks the real addressable market for everyone.
+
+### 6.6 Market-Clearing Price (Pricing Research Payoff)
+
+Teams that purchase the **Pricing Research** recurring R&D investment receive, in their round results, the **market-clearing price** for each of their models in each region they targeted.
+
+The market-clearing price is the price that would have exactly sold out your production allocation in that region — neither surplus nor unmet demand. It is computed analytically from the linear elasticity formula (binary search for Sports Cars where the prestige curve makes analytic inversion impractical).
+
+A result of **$0** means the round was demand-limited or you were the only seller — demand alone was the binding constraint, not price. Use this data to calibrate pricing year-over-year: if clearing price is well above your actual price, you left margin on the table; if it is below, you were overpriced and left units unsold.
+
+This intel is shown in the **Vehicles tab regional breakdown** and is only visible to the team that paid for the subscription.
 
 ---
 
@@ -794,7 +824,7 @@ This makes capacity decisions feel consequential in both directions — overprod
 
 ## 11. Competitive Scarcity Mechanics
 
-All scarcity effects resolve **after all teams submit simultaneously** — the engine aggregates industry behavior first, then applies effects. No ordering advantage exists within a round. The strategic skill is **predicting** what competitors will do before you lock in.
+**All five mechanics are implemented in the engine.** They resolve after all teams submit simultaneously — the engine aggregates industry behavior first, then applies effects. No ordering advantage exists within a round. The strategic skill is **predicting** what competitors will do before you lock in.
 
 ### 11.1 Parts Supply Chain Pressure
 
@@ -838,11 +868,7 @@ A 20% regional oversupply forces an 8% price discount on everyone — including 
 
 The first team to invest in a major R&D unlock gets an exclusive window before competitors can access it. Exclusivity is measured **across rounds**, not within a round.
 
-| Unlock | Exclusive Window | Competitor options during window |
-|---|---|---|
-| Autonomous driving | 2 years | Develop independently (+60% cost), or license from pioneer |
-| All-electric drivetrain | 2 years | Same |
-| Fuel efficiency upgrade | 1 year | Same |
+All tech tree unlocks share a **2-round exclusivity window** from the round they are first purchased. The original per-unlock window sizes were simplified to a uniform constant in the engine.
 
 **Tiebreaker rule:** If two teams invest in the same unlock in the same round, both unlock it simultaneously — no exclusivity granted. The window only opens when one team is clearly one full round ahead.
 
@@ -945,6 +971,12 @@ The leaderboard (Valuation, Revenue, CAGR, Market Share, Brand Score) publishes 
 | 23 | Year 1 Market Briefing: distributed before decisions; includes demand totals, public perception, policy baseline | ✅ |
 | 24 | Brand and model naming: team-controlled, profanity-filtered, character-limited | ✅ |
 | 25 | Two game modes: Classroom (external facilitator, manual round pacing) and Party (host is a player, timer-driven auto-resolve). Same schema — host has FACILITATOR role + TeamMember record. UI branches on team membership. | ✅ |
+| 26 | Absolute demand price curves (§6.5): industry-avg price vs. per-type band shrinks or boosts total market pool. Below band → up to +15%; above ceiling → linear decay to 0.25×. | ✅ |
+| 27 | Market-clearing price (§6.6): Pricing Research payoff includes per-model-per-region clearing price. Analytic inversion for linear elasticity; binary search for Sports Car prestige curve. | ✅ |
+| 28 | Research subscriptions return actual intel objects: Competitor Research → rival brand/share/price/built/sold; Market Research → exact regional demand by segment. Gated — non-payers get nothing. | ✅ |
+| 29 | Tech tree one-per-tree-per-round constraint: at most one unlock per tree (mfg/aero/power/market) per round; prereqs satisfied from owned unlocks only, not same-round purchases. | ✅ |
+| 30 | Submit-time capacity guard: server blocks submit when total production > owned + new facility capacity. Engine applies proportional scale-down as defense-in-depth for auto-resolve path. | ✅ |
+| 31 | End-game leaderboard at /final: final cash ranking, cash-trajectory line chart (Year 0→N), superlatives (Best Year / Most Units / Strongest Brand), medal standings. | ✅ |
 
 ---
 
@@ -958,9 +990,10 @@ The leaderboard (Valuation, Revenue, CAGR, Market Share, Brand Score) publishes 
 | Sprint 1 | Tech stack, scaffolding, GitHub repo | ✅ Done |
 | Sprint 2 | Database schema + auth | ✅ Done |
 | Sprint 3 | Game & team management (lobby, join flow, start game) | ✅ Done |
-| Sprint 4 | Decision submission UI (all 5 role sections) | Pending |
-| Sprint 5 | Simulation engine (demand allocation, financials, round resolution) | Pending |
-| Sprint 6 | Results & dashboards (round report, leaderboard, team financials) | Pending |
-| Sprint 7 | Party mode (host flow, countdown timer, auto-resolve) + Classroom mode (facilitator round control, debrief tools) | Pending |
-| Sprint 8 | World events system (full event pool, policy weighting, lobbying steering) | Pending |
+| Sprint 4 | Decision submission UI (all 5 role sections) | ✅ Done |
+| Sprint 5 | Simulation engine (demand allocation, financials, round resolution, all 5 scarcity mechanics) | ✅ Done |
+| Sprint 6 | Results & dashboards (round report, leaderboard, team financials, visual analytics) | ✅ Done |
+| Sprint 7 | Party mode (host flow, countdown timer, auto-resolve) + Classroom mode (facilitator round control, kick, debrief tools) | ✅ Done |
+| Sprint 8 | World events system (full event pool, policy weighting, lobbying steering) | ✅ Done |
+| Sprint 9 | End-game leaderboard (/final), absolute demand price curves, market-clearing price, research intel payoffs, capacity enforcement, tech-tree one-per-tree-per-round | ✅ Done |
 | Sprint 9 | Deploy & playtest | Pending |

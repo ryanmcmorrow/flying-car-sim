@@ -187,7 +187,12 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
         style={{ zIndex: 1 }}
       >
         {/* Header */}
-        <div className="flex justify-end mb-2">
+        <div className="flex justify-between items-center mb-2">
+          {gameData.isHost ? (
+            <a href={`/facilitator/${gameData.id}`} style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.42rem", color: "#00f5ff", border: "2px solid #00f5ff", padding: "0.2rem 0.5rem", textDecoration: "none" }}>
+              ⚙ FACILITATOR VIEW
+            </a>
+          ) : <div />}
           <SignOutButton className="pixel-btn" style={{ fontSize: "0.4rem", background: "transparent", color: "#8888aa", border: "2px solid #8888aa", boxShadow: "none" }} />
         </div>
         <div className="text-center mb-8">
