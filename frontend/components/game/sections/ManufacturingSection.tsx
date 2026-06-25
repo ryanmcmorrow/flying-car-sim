@@ -6,9 +6,9 @@ import type { ManufacturingSection as ManufacturingSectionType, SpaceSize, Facil
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const SPACE_OPTS = [
-  { size: "small" as SpaceSize,  label: "SMALL",  capacity: 5_000,  buy: "$40M",  maintenance: "$3M/yr"  },
-  { size: "medium" as SpaceSize, label: "MEDIUM", capacity: 20_000, buy: "$120M", maintenance: "$8M/yr"  },
-  { size: "large" as SpaceSize,  label: "LARGE",  capacity: 50_000, buy: "$300M", maintenance: "$20M/yr" },
+  { size: "small" as SpaceSize,  label: "SMALL",  capacity: 5_000,  buy: "$70M",  maintenance: "$6M/yr"  },
+  { size: "medium" as SpaceSize, label: "MEDIUM", capacity: 20_000, buy: "$200M", maintenance: "$15M/yr" },
+  { size: "large" as SpaceSize,  label: "LARGE",  capacity: 50_000, buy: "$500M", maintenance: "$40M/yr" },
 ] as const;
 
 const CAPACITY: Record<SpaceSize, number> = { small: 5_000, medium: 20_000, large: 50_000 };

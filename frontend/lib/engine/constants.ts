@@ -211,18 +211,18 @@ export const SPACE_COSTS: Record<
 > = {
   small: {
     capacity: 5_000,
-    buyPrice: 40_000_000,
-    maintenance: 3_000_000,
+    buyPrice: 70_000_000,
+    maintenance: 6_000_000,
   },
   medium: {
     capacity: 20_000,
-    buyPrice: 120_000_000,
-    maintenance: 8_000_000,
+    buyPrice: 200_000_000,
+    maintenance: 15_000_000,
   },
   large: {
     capacity: 50_000,
-    buyPrice: 300_000_000,
-    maintenance: 20_000_000,
+    buyPrice: 500_000_000,
+    maintenance: 40_000_000,
   },
 };
 
