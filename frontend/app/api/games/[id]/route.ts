@@ -83,3 +83,21 @@ export async function GET(
     })),
   });
 }
+
+// DELETE /api/games/[id] — permanently delete a game (facilitator only)
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.user.role !== "FACILITATOR") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const game = await db.game.findUnique({ where: { id }, select: { facilitatorId: true } });
+  if (!game) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (game.facilitatorId !== session.user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  await db.game.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}

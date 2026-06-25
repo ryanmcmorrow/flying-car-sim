@@ -58,6 +58,19 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
   const [joinError, setJoinError] = useState("");
 
   const [gameList, setGameList] = useState<GameSummary[]>(games);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  async function handleDelete(id: string) {
+    setDeletingId(id);
+    try {
+      await fetch(`/api/games/${id}`, { method: "DELETE" });
+      setGameList((prev) => prev.filter((g) => g.id !== id));
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
+  }
 
   async function handleCreate() {
     setCreateError("");
@@ -145,21 +158,42 @@ export function FacilitatorDashboardClient({ games, facilitatorName }: Props) {
           <div className="space-y-4 mt-6">
             <p className="pixel-heading" style={{ fontSize: "0.5rem", color: "#8888aa" }}>Your games ({gameList.length})</p>
             {gameList.map((game) => (
-              <Link key={game.id} href={`/facilitator/${game.id}`} style={{ display: "block" }}>
-                <div className="pixel-card" style={{ cursor: "pointer", transition: "none", borderColor: game.status === "ACTIVE" ? "#39ff14" : game.status === "COMPLETED" ? "#8888aa" : "#00f5ff" }}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <span className="pixel-heading" style={{ fontSize: "1rem", letterSpacing: "0.3em" }}>{game.code}</span>
-                      <span className={`pixel-badge ${STATUS_CLASSES[game.status]}`} style={{ fontSize: "0.45rem" }}>{STATUS_LABELS[game.status]}</span>
-                    </div>
-                    <div className="flex items-center gap-6" style={{ fontSize: "0.95rem", color: "#888899" }}>
-                      <span><span style={{ color: "#ffbe0b" }}>{game.teamCount}</span> TEAMS</span>
-                      <span>RND <span style={{ color: "#00f5ff" }}>{game.currentRound}</span></span>
-                      <span style={{ color: "#8888aa", fontSize: "0.85rem" }}>→</span>
-                    </div>
+              <div key={game.id} className="pixel-card flex items-center justify-between gap-4" style={{ borderColor: game.status === "ACTIVE" ? "#39ff14" : game.status === "COMPLETED" ? "#8888aa" : "#00f5ff" }}>
+                <Link href={`/facilitator/${game.id}`} style={{ flex: 1, textDecoration: "none", display: "flex", alignItems: "center", gap: "1rem" }}>
+                  <span className="pixel-heading" style={{ fontSize: "1rem", letterSpacing: "0.3em" }}>{game.code}</span>
+                  <span className={`pixel-badge ${STATUS_CLASSES[game.status]}`} style={{ fontSize: "0.45rem" }}>{STATUS_LABELS[game.status]}</span>
+                  <span style={{ fontSize: "0.95rem", color: "#888899", marginLeft: "auto" }}>
+                    <span style={{ color: "#ffbe0b" }}>{game.teamCount}</span> TEAMS
+                  </span>
+                  <span style={{ fontSize: "0.95rem", color: "#888899" }}>RND <span style={{ color: "#00f5ff" }}>{game.currentRound}</span></span>
+                  <span style={{ color: "#8888aa", fontSize: "0.85rem" }}>→</span>
+                </Link>
+                {confirmDeleteId === game.id ? (
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontFamily: px, fontSize: "0.38rem", color: "#ff006e" }}>DELETE?</span>
+                    <button
+                      onClick={() => handleDelete(game.id)}
+                      disabled={deletingId === game.id}
+                      style={{ fontFamily: px, fontSize: "0.38rem", color: "#ff006e", border: "2px solid #ff006e", background: "#1a000d", padding: "0.2rem 0.5rem", cursor: "pointer" }}
+                    >
+                      {deletingId === game.id ? "..." : "YES"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      style={{ fontFamily: px, fontSize: "0.38rem", color: "#8888aa", border: "2px solid #8888aa", background: "transparent", padding: "0.2rem 0.5rem", cursor: "pointer" }}
+                    >
+                      NO
+                    </button>
                   </div>
-                </div>
-              </Link>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteId(game.id)}
+                    style={{ fontFamily: px, fontSize: "0.38rem", color: "#8888aa", border: "2px solid #8888aa", background: "transparent", padding: "0.2rem 0.5rem", cursor: "pointer", flexShrink: 0 }}
+                  >
+                    🗑
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
