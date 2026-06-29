@@ -98,6 +98,35 @@ export default async function ResultsPage({ params }: PageProps) {
       teamResult = result.teamResult;
       industrySnapshot = result.industrySnapshot;
     }
+    // Also load all team results so we can show competitor model sales in the trade report
+    const allResults = await db.roundResult.findMany({
+      where: { roundId: round.id },
+      include: { team: { select: { id: true, brandName: true } } },
+    });
+    allTeamResults = allResults.map((r: { teamId: string; team: { brandName: string }; teamResult: unknown }) => ({
+      teamId: r.teamId,
+      brandName: r.team.brandName,
+      teamResult: r.teamResult,
+    }));
+  }
+
+  // Prior demand — for round 1 use game settings baseline; for round N use prior round snapshot
+  let priorDemand: number | undefined = (game.settings as Record<string, unknown>).totalFlyingCarDemand as number | undefined;
+  if (roundNumber > 1) {
+    const priorRound = await db.round.findFirst({
+      where: { gameId, roundNumber: roundNumber - 1 },
+      select: { id: true },
+    });
+    if (priorRound) {
+      const priorResult = await db.roundResult.findFirst({
+        where: { roundId: priorRound.id },
+        select: { industrySnapshot: true },
+      });
+      if (priorResult) {
+        const ps = priorResult.industrySnapshot as Record<string, unknown>;
+        priorDemand = ps.totalFlyingCarDemand as number | undefined ?? priorDemand;
+      }
+    }
   }
 
   if (!industrySnapshot) {
@@ -130,8 +159,9 @@ export default async function ResultsPage({ params }: PageProps) {
       isFacilitator={showFacilitatorView}
       teamResult={teamResult as Record<string, unknown> | null}
       industrySnapshot={industrySnapshot as Record<string, unknown>}
-      allTeamResults={showFacilitatorView ? allTeamResults : undefined}
+      allTeamResults={allTeamResults.length > 0 ? allTeamResults : undefined}
       rdUnlocks={rdUnlocks}
+      priorDemand={priorDemand}
     />
   );
 }

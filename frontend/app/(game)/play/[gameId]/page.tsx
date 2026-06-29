@@ -99,13 +99,35 @@ export default async function PlayPage({ params, searchParams }: PageProps) {
     }
   }
 
-  // Upsert decision record with empty defaults
+  // For round 2+, carry forward vehicle models from the prior round (isNewDesign: false = no re-engineering fee)
+  let initialVehicleSection = getEmptyVehicleSection();
+  if (round.roundNumber > 1) {
+    const prevRound = game.rounds.find((r) => r.roundNumber === round.roundNumber - 1)
+      ?? await db.round.findFirst({ where: { gameId, roundNumber: round.roundNumber - 1 }, select: { id: true } });
+    if (prevRound) {
+      const prevDecision = await db.decision.findUnique({
+        where: { roundId_teamId: { roundId: prevRound.id, teamId: team.id } },
+        select: { vehicleSection: true },
+      });
+      if (prevDecision?.vehicleSection) {
+        type VS = { models?: Array<Record<string, unknown>> };
+        const prevVS = prevDecision.vehicleSection as VS;
+        if (prevVS.models && prevVS.models.length > 0) {
+          initialVehicleSection = {
+            models: prevVS.models.map((m) => ({ ...m, isNewDesign: false })),
+          } as typeof initialVehicleSection;
+        }
+      }
+    }
+  }
+
+  // Upsert decision record with defaults (vehicles pre-populated from prior round if available)
   const decision = await db.decision.upsert({
     where: { roundId_teamId: { roundId: round.id, teamId: team.id } },
     create: {
       roundId: round.id,
       teamId: team.id,
-      vehicleSection: getEmptyVehicleSection() as unknown as Prisma.InputJsonValue,
+      vehicleSection: initialVehicleSection as unknown as Prisma.InputJsonValue,
       rdSection: getEmptyRdSection() as unknown as Prisma.InputJsonValue,
       manufacturingSection: getEmptyManufacturingSection() as unknown as Prisma.InputJsonValue,
       productionSection: getEmptyProductionSection() as unknown as Prisma.InputJsonValue,

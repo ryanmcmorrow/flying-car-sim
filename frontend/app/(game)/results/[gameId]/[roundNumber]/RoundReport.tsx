@@ -477,6 +477,7 @@ interface RoundReportProps {
     teamResult: unknown;
   }>;
   rdUnlocks?: string[];
+  priorDemand?: number;
 }
 
 function fmt(n: number): string {
@@ -533,22 +534,31 @@ function BrandMeter({ value }: { value: number }) {
 }
 
 // ── Trade Publication Narrative ─────────────────────────────────────────────
-function TradeReport({ snap, roundNumber }: { snap: IndustrySnapshotData; roundNumber: number }) {
+type AllTeamResultEntry = { teamId: string; brandName: string; teamResult: unknown };
+type ModelResultPublic = { modelName: string; vehicleType: string; unitsSold: number; salePrice: number; unitsProduced: number };
+
+function TradeReport({ snap, roundNumber, priorDemand, allTeamResults }: {
+  snap: IndustrySnapshotData;
+  roundNumber: number;
+  priorDemand: number;
+  allTeamResults?: AllTeamResultEntry[];
+}) {
   const px = "var(--font-pixel), monospace";
   const body = "var(--font-pixel-body), monospace";
 
   type Blurb = { headline: string; body: string; tag: string };
   const blurbs: Blurb[] = [];
 
-  // Demand overview
+  // Demand overview — use % change from prior period so language works at any demand scale
   const demand = snap.totalFlyingCarDemand;
   const totalMarket = demand + snap.totalTraditionalDemand;
   const shareOfMarket = totalMarket > 0 ? ((demand / totalMarket) * 100).toFixed(1) : "0.0";
   const demandK = Math.round(demand / 1000);
-  const demandVerb = demand >= 450_000 ? "surges past" : demand >= 300_000 ? "grows to" : demand >= 180_000 ? "holds at" : "slides to";
-  const demandComment = demand >= 400_000
+  const changePct = priorDemand > 0 ? (demand - priorDemand) / priorDemand : 0;
+  const demandVerb = changePct >= 0.15 ? "surges past" : changePct >= 0.03 ? "grows to" : changePct >= -0.03 ? "holds at" : "slides to";
+  const demandComment = changePct >= 0.10
     ? "Analysts describe growth as ahead of consensus forecasts."
-    : demand <= 200_000
+    : changePct <= -0.08
     ? "Analysts warn continued softness may trigger capacity cutbacks across the sector."
     : "The category continues its measured expansion as consumer adoption broadens.";
   blurbs.push({
@@ -602,6 +612,23 @@ function TradeReport({ snap, roundNumber }: { snap: IndustrySnapshotData; roundN
 
   const items = blurbs.slice(0, 6);
 
+  // Build competitor model table from allTeamResults
+  const brandModelRows: Array<{ brandName: string; models: ModelResultPublic[]; totalSold: number; marketShare: number }> = [];
+  if (allTeamResults && allTeamResults.length > 0) {
+    for (const entry of allTeamResults) {
+      const tr = entry.teamResult as { modelResults?: ModelResultPublic[] } | null;
+      const models = (tr?.modelResults ?? []).filter((m) => m.unitsSold > 0 || m.unitsProduced > 0);
+      const leaderEntry = snap.leaderboard.find((l) => l.teamId === entry.teamId);
+      brandModelRows.push({
+        brandName: entry.brandName,
+        models,
+        totalSold: leaderEntry?.unitsSold ?? 0,
+        marketShare: leaderEntry?.marketShare ?? 0,
+      });
+    }
+    brandModelRows.sort((a, b) => b.totalSold - a.totalSold);
+  }
+
   return (
     <div className="mb-6" style={{ border: "2px solid #2a2a4a", background: "#05050e" }}>
       <div style={{ borderBottom: "2px solid #2a2a4a", padding: "0.4rem 0.75rem", display: "flex", alignItems: "baseline", gap: "1rem" }}>
@@ -613,7 +640,7 @@ function TradeReport({ snap, roundNumber }: { snap: IndustrySnapshotData; roundN
         </span>
       </div>
       {items.map((item, i) => (
-        <div key={i} style={{ padding: "0.55rem 0.75rem", borderBottom: i < items.length - 1 ? "1px solid #1a1a2e" : "none" }}>
+        <div key={i} style={{ padding: "0.55rem 0.75rem", borderBottom: "1px solid #1a1a2e" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.15rem" }}>
             <span style={{ fontFamily: px, fontSize: "0.42rem", color: "#8888aa", flexShrink: 0 }}>
               [{item.tag}]
@@ -627,6 +654,54 @@ function TradeReport({ snap, roundNumber }: { snap: IndustrySnapshotData; roundN
           </p>
         </div>
       ))}
+      {brandModelRows.length > 0 && (
+        <div style={{ padding: "0.55rem 0.75rem" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "0.5rem" }}>
+            <span style={{ fontFamily: px, fontSize: "0.42rem", color: "#8888aa", flexShrink: 0 }}>[SALES]</span>
+            <span style={{ fontFamily: px, fontSize: "0.5rem", color: "var(--px-white)", lineHeight: 1.5 }}>
+              Year {roundNumber} Model-Level Sales — All Brands
+            </span>
+          </div>
+          {brandModelRows.map((brand) => (
+            <div key={brand.brandName} style={{ marginBottom: "0.6rem" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem", marginBottom: "0.2rem" }}>
+                <span style={{ fontFamily: px, fontSize: "0.45rem", color: "var(--px-cyan)" }}>{brand.brandName}</span>
+                <span style={{ fontFamily: body, fontSize: "0.85rem", color: "var(--px-gray)" }}>
+                  {brand.totalSold.toLocaleString()} units total · {(brand.marketShare * 100).toFixed(1)}% share
+                </span>
+              </div>
+              {brand.models.length === 0 ? (
+                <p style={{ fontFamily: body, fontSize: "0.85rem", color: "#555577", marginLeft: "0.75rem" }}>No models sold.</p>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", marginLeft: "0.75rem" }}>
+                  <thead>
+                    <tr>
+                      {["MODEL", "TYPE", "SALE PRICE", "PRODUCED", "SOLD"].map((h) => (
+                        <th key={h} style={{ fontFamily: px, fontSize: "0.35rem", color: "#555577", textAlign: "left", paddingRight: "0.75rem", paddingBottom: "0.2rem", borderBottom: "1px solid #1a1a2e" }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {brand.models.map((m, mi) => (
+                      <tr key={mi}>
+                        <td style={{ fontFamily: body, fontSize: "0.85rem", color: "#cccccc", paddingRight: "0.75rem", paddingTop: "0.15rem" }}>{m.modelName}</td>
+                        <td style={{ fontFamily: body, fontSize: "0.85rem", color: "#8888aa", paddingRight: "0.75rem" }}>{m.vehicleType.replace(/_/g, " ")}</td>
+                        <td style={{ fontFamily: body, fontSize: "0.85rem", color: "var(--px-amber)", paddingRight: "0.75rem" }}>
+                          ${m.salePrice >= 1_000_000 ? (m.salePrice / 1_000_000).toFixed(2) + "M" : (m.salePrice / 1_000).toFixed(0) + "K"}
+                        </td>
+                        <td style={{ fontFamily: body, fontSize: "0.85rem", color: "#8888aa", paddingRight: "0.75rem" }}>{m.unitsProduced.toLocaleString()}</td>
+                        <td style={{ fontFamily: body, fontSize: "0.85rem", color: "var(--px-green)" }}>{m.unitsSold.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -797,6 +872,7 @@ export function RoundReport({
   industrySnapshot: industrySnapshotRaw,
   allTeamResults,
   rdUnlocks = [],
+  priorDemand,
 }: RoundReportProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("pl");
@@ -866,11 +942,11 @@ export function RoundReport({
         )}
         {roundNumber === latestRound - 1 && (
           <button
-            onClick={() => router.push(`/play/${gameId}`)}
+            onClick={() => router.push(`/play/${gameId}?from=results`)}
             className="pixel-btn pixel-btn-green"
             style={{ fontFamily: pxFont, fontSize: "0.45rem" }}
           >
-            BACK TO DECISIONS →
+            PLAY YEAR {roundNumber + 1} →
           </button>
         )}
       </div>
@@ -961,7 +1037,7 @@ export function RoundReport({
       )}
 
       {/* Industry Trade Report */}
-      <TradeReport snap={snap} roundNumber={roundNumber} />
+      <TradeReport snap={snap} roundNumber={roundNumber} priorDemand={priorDemand ?? snap.totalFlyingCarDemand} allTeamResults={allTeamResults} />
 
       {/* Policy + Perception */}
       <div className="grid grid-cols-2 gap-4 mb-6">
