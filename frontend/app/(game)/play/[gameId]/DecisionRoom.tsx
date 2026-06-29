@@ -358,12 +358,11 @@ export function DecisionRoom({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            pointerEvents: "none",
           }}
         >
           <div
             className="pixel-card pixel-card-green"
-            style={{ textAlign: "center" }}
+            style={{ textAlign: "center", maxWidth: 420 }}
           >
             <p
               className="pixel-heading"
@@ -392,12 +391,18 @@ export function DecisionRoom({
                       </span>
                     ))}
                   </div>
-                  <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.9rem", color: "var(--px-gray)", marginTop: "0.75rem" }}>
-                    Once all teams submit, the facilitator resolves the round.
-                  </p>
                 </>
               );
             })()}
+            {isFacilitator && (
+              <a
+                href={`/facilitator/${game.id}`}
+                className="pixel-btn pixel-btn-pink"
+                style={{ display: "block", marginTop: "1.25rem", fontFamily: "var(--font-pixel)", fontSize: "0.5rem" }}
+              >
+                ⚙ GO TO FACILITATOR VIEW
+              </a>
+            )}
           </div>
         </div>
       )}
