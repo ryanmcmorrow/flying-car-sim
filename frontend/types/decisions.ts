@@ -17,6 +17,7 @@ export interface VehicleModel {
     | "entertainment"
   >;
   isNewDesign: boolean;
+  modelYear?: number; // round in which this model was last designed or refreshed
 }
 
 export interface VehicleSection {

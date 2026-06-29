@@ -114,7 +114,7 @@ export default async function PlayPage({ params, searchParams }: PageProps) {
         const prevVS = prevDecision.vehicleSection as VS;
         if (prevVS.models && prevVS.models.length > 0) {
           initialVehicleSection = {
-            models: prevVS.models.map((m) => ({ ...m, isNewDesign: false })),
+            models: prevVS.models.map((m) => ({ ...m, isNewDesign: false, modelYear: (m.modelYear as number) ?? 1 })),
           } as typeof initialVehicleSection;
         }
       }
@@ -136,6 +136,17 @@ export default async function PlayPage({ params, searchParams }: PageProps) {
     },
     update: {},
   });
+
+  // If the decision already existed with no vehicles but we have carry-over, backfill now.
+  // This handles cases where the decision was created before carry-over was introduced.
+  const decisionHasVehicles = ((decision.vehicleSection as { models?: unknown[] })?.models?.length ?? 0) > 0;
+  if (!decisionHasVehicles && initialVehicleSection.models.length > 0) {
+    await db.decision.update({
+      where: { roundId_teamId: { roundId: round.id, teamId: team.id } },
+      data: { vehicleSection: initialVehicleSection as unknown as Prisma.InputJsonValue },
+    });
+    (decision as Record<string, unknown>).vehicleSection = initialVehicleSection;
+  }
 
   // Load R&D unlocks for this team (with exclusivity windows)
   const rdUnlockRows = await db.rdUnlock.findMany({

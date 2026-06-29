@@ -148,6 +148,8 @@ export async function resolveGameById(gameId: string): Promise<ResolveResult> {
     });
   }
 
+  const segmentCrowdingRounds = (settings.segmentCrowdingRounds as Record<string, number>) ?? {};
+
   const resolveInput: ResolveRoundInput = {
     roundNumber,
     gameId: game.id,
@@ -161,6 +163,7 @@ export async function resolveGameById(gameId: string): Promise<ResolveResult> {
     teamBrandPerceptions,
     teamSpaces,
     perceptionPolicyBonusPending,
+    segmentCrowdingRounds,
   };
 
   const output = resolveRound(resolveInput);

@@ -250,9 +250,14 @@ export const SCARCITY_MASS_PRODUCED_TIER1_UNITS = 30_000;
 export const SCARCITY_MASS_PRODUCED_TIER1_COST = 800;
 
 // ── Segment crowding ──────────────────────────────────────────────────────────
+export const CROWDING_2_TEAMS_MKT_PENALTY = 0.95;
 export const CROWDING_3_TEAMS_MKT_PENALTY = 0.85;
 export const CROWDING_4PLUS_TEAMS_MKT_PENALTY = 0.70;
-export const CROWDING_4PLUS_PRICE_REDUCTION = 0.08; // 8% forced down
+// Progressive price compression: (N-1) * 5% per brand in segment (capped at 25%)
+export const CROWDING_PRICE_COMPRESSION_PER_BRAND = 0.05;
+export const CROWDING_PRICE_COMPRESSION_CAP = 0.25;
+// Monopoly pricing power: sole brand in segment gets +10% demand
+export const MONOPOLY_DEMAND_BONUS = 0.10;
 
 // ── Regional glut ─────────────────────────────────────────────────────────────
 export const GLUT_DISCOUNT_COEFFICIENT = 0.40;
@@ -372,6 +377,12 @@ export const TECH_TREE_COSTS: Record<string, number> = {
   all_electric: 14_000_000,
   full_autonomy: 18_000_000,
   market_dominance: 10_000_000,
+  // Segment-specific platform R&D
+  urban_mobility_suite: 6_000_000,
+  luxury_chassis: 12_000_000,
+  heavy_duty_platform: 10_000_000,
+  performance_engineering: 14_000_000,
+  family_safety_package: 8_000_000,
 };
 
 // ── all_electric policy bonus ──────────────────────────────────────────────────

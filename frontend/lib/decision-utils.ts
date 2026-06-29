@@ -158,7 +158,7 @@ export function isSectionComplete(section: SectionKey, data: unknown): boolean {
 
 // ── Tech Tree ─────────────────────────────────────────────────────────────────
 
-export type TechTree = "mfg" | "aero" | "power" | "market";
+export type TechTree = "mfg" | "aero" | "power" | "market" | "segment";
 
 export interface TechNode {
   key: string;
@@ -239,6 +239,27 @@ const TECH_TREE_DEF: Omit<TechNode, "available">[] = [
   {
     key: "market_dominance", name: "Market Dominance", tree: "market", tier: 4, cost: 10_000_000, prereqs: ["demand_forecasting_ai", "competitive_intel"],
     desc: "Total market intelligence supremacy. You see full competitor pricing, regional demand shifts, and segment saturation before each round closes. Combine with Demand Forecasting AI to always be a step ahead.",
+  },
+  // Segment-specific platform investments (Tier 2, first-mover exclusivity, no tree prereqs)
+  {
+    key: "urban_mobility_suite", name: "Urban Mobility Suite", tree: "segment", tier: 2, cost: 6_000_000, prereqs: [],
+    desc: "Compact-optimized engineering: lightweight chassis, modular battery packs, city infrastructure partnerships. Reduces Compact unit manufacturing cost by 12%. Best early investment for a Compact-focused strategy.",
+  },
+  {
+    key: "luxury_chassis", name: "Luxury Chassis Platform", tree: "segment", tier: 2, cost: 12_000_000, prereqs: [],
+    desc: "Premium materials and ride engineering for SUV and Sports Car. Boosts quality score +15% for those segments, and significantly reduces the price compression penalty in crowded markets — your premium positioning holds longer.",
+  },
+  {
+    key: "heavy_duty_platform", name: "Heavy Duty Platform", tree: "segment", tier: 2, cost: 10_000_000, prereqs: [],
+    desc: "Industrial-grade airframe and powertrain for Trucks. Reduces Truck unit cost by 15% and downgrades any recall event by one tier — a critical recall becomes major, a major becomes minor.",
+  },
+  {
+    key: "performance_engineering", name: "Performance Engineering", tree: "segment", tier: 2, cost: 14_000_000, prereqs: [],
+    desc: "Track-derived aerodynamics and power systems for Sports Cars. Boosts Sports Car quality score by 25% — the single largest per-model demand multiplier in the game. Essential to dominate the sports segment.",
+  },
+  {
+    key: "family_safety_package", name: "Family Safety Package", tree: "segment", tier: 2, cost: 8_000_000, prereqs: [],
+    desc: "Five-star crash ratings, advanced collision avoidance, and family-first marketing. Adds +4 brand perception per round that you sell SUVs — compounding reputation that transcends any single product.",
   },
 ];
 

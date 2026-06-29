@@ -100,6 +100,14 @@ export function computeEffectiveUnitCost(
     cost += massProducedPenalty;
   }
 
+  // Segment-specific platform R&D cost reductions
+  if (model.vehicleType === "COMPACT" && rdUnlocks.includes("urban_mobility_suite")) {
+    cost *= 0.88; // -12%
+  }
+  if (model.vehicleType === "TRUCK" && rdUnlocks.includes("heavy_duty_platform")) {
+    cost *= 0.85; // -15%
+  }
+
   // World event manufacturing cost modifier
   cost = cost * (1 + worldEventMfgCostModifier);
 
@@ -133,6 +141,17 @@ export function computeQualityScore(
   // full_autonomy multiplier
   if (rdUnlocks.includes("full_autonomy")) {
     qualityScore *= 1.10;
+  }
+
+  // Segment-specific platform R&D quality bonuses
+  if (model.vehicleType === "SPORTS_CAR" && rdUnlocks.includes("performance_engineering")) {
+    qualityScore *= 1.25; // +25% for Sports Car
+  }
+  if ((model.vehicleType === "SUV" || model.vehicleType === "SPORTS_CAR") && rdUnlocks.includes("luxury_chassis")) {
+    qualityScore *= 1.15; // +15% for SUV / Sports Car
+  }
+  if (model.vehicleType === "SUV" && rdUnlocks.includes("family_safety_package")) {
+    qualityScore *= 1.08; // +8% perception-driven quality lift for SUV
   }
 
   return qualityScore;

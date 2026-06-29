@@ -287,7 +287,7 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
                 <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(0,245,255,0.05)", border: "1px solid rgba(0,245,255,0.2)" }}>
                   <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-cyan)" }}>FLYING CARS</p>
                   <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "var(--px-cyan)", marginTop: "0.2rem" }}>~{flyingK}K</p>
-                  <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>est. for {n} team{n !== 1 ? "s" : ""}</p>
+                  <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>units / yr</p>
                 </div>
                 <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(136,136,170,0.05)", border: "1px solid rgba(136,136,170,0.2)" }}>
                   <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-gray)" }}>COMPETITORS</p>
@@ -322,9 +322,6 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
               </div>
             );
           })}
-          <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)", marginTop: "0.75rem" }}>
-            Demand scales with team count. A small factory (5K units) fills ~one segment in one region.
-          </p>
         </div>
 
         {/* Team roster */}
@@ -482,7 +479,7 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
               }}
             >
               <div>
-                <span style={{ color: "#888899" }}>TOTAL DEMAND: <Tooltip text="How large the overall flying car market is this year. Scales with the number of teams — a small factory fills roughly one segment in one region." /></span>
+                <span style={{ color: "#888899" }}>TOTAL DEMAND: <Tooltip text="How large the overall flying car market is this year." /></span>
                 <br />
                 <span style={{ color: totalDemandLabel(briefing.totalFlyingCarDemand).color, fontSize: "1.2rem" }}>
                   {totalDemandLabel(briefing.totalFlyingCarDemand).label}

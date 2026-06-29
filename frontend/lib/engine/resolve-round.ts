@@ -23,7 +23,7 @@ import { computeSupplyChainScarcity, computeSegmentCrowding, computeRegionalGlut
 import { computeReliabilityScore, getRecallTier, computeBrandPerceptionDelta, computeNewPublicPerception } from "./perception";
 import { computeTeamRdSpend, computeEffectiveUnitCost, computeQualityScore, computeSpaceCost, computeRepairRevenue, computeFleetRepairRate, computeInventoryCarryingCost, computeEngineeringFeesForTeam } from "./financials";
 import type { FacilitiesCostResult } from "./financials";
-import { SHIPPING_COST_PER_UNIT } from "./constants";
+import { SHIPPING_COST_PER_UNIT, MONOPOLY_DEMAND_BONUS } from "./constants";
 import { computePolicyScoreUpdate } from "./lobbying";
 import { TECH_TREE_DEF } from "@/lib/decision-utils";
 
@@ -42,6 +42,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     teamBrandPerceptions,
     teamSpaces,
     perceptionPolicyBonusPending,
+    segmentCrowdingRounds,
   } = input;
 
   // If no teams, return empty output
@@ -407,7 +408,17 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
         absDemandMultiplier = Math.max(0.25, 1.0 - 0.75 * overshoot);
       }
 
+      // Monopoly pricing power: sole brand in segment gets +10% demand
+      const competitorCount = crowdingResult.teamCountByType[vt];
+      if (competitorCount === 1) {
+        absDemandMultiplier = Math.min(1.5, absDemandMultiplier * (1 + MONOPOLY_DEMAND_BONUS));
+      }
+
       const demandHere = Math.round(baseDemandHere * absDemandMultiplier);
+
+      // Quality ratchet: crowded segments raise consumer expectations over time.
+      // Mass-produced vehicles take an increasing demand penalty in mature crowded segments.
+      const crowdingRoundsForType = segmentCrowdingRounds?.[vt] ?? 0;
 
       // ── Relative demand share ─────────────────────────────────────────────
       const avgPrice = competitors.reduce((s, c) => s + c.salePrice, 0) / competitors.length;
@@ -445,11 +456,27 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
           marketingShareRaw = effectiveSpend * crowdingFactor;
         }
 
-        const baseScore = brandMulti * c.qualityScore * marketingShareRaw;
+        // Quality ratchet penalty: mass-produced vehicles lose demand in mature crowded segments
+        const massProducedPenalty =
+          c.model.internals === "mass_produced" && crowdingRoundsForType >= 3 ? 0.25 :
+          c.model.internals === "mass_produced" && crowdingRoundsForType >= 1 ? 0.12 : 0;
+
+        // Model age penalty: stale models that haven't been refreshed lose demand year-over-year
+        const modelAge = roundNumber - (c.model.modelYear ?? roundNumber);
+        const agePenalty = modelAge >= 3 ? 0.20 : modelAge >= 2 ? 0.12 : modelAge >= 1 ? 0.05 : 0;
+
+        const baseScore = brandMulti * c.qualityScore * marketingShareRaw * (1 - massProducedPenalty) * (1 - agePenalty);
         baseScores.push(baseScore);
 
+        // Luxury Chassis: reduced price compression for SUV/Sports Car
+        const teamPriceForcedDown =
+          (vt === "SUV" || vt === "SPORTS_CAR") &&
+          (teamCalcs[c.team.teamId]?.allRdUnlocks ?? []).includes("luxury_chassis")
+            ? priceForcedDown * 0.35
+            : priceForcedDown;
+
         let priceFactor: number;
-        const effectiveSalePrice = c.salePrice * (1 - priceForcedDown);
+        const effectiveSalePrice = c.salePrice * (1 - teamPriceForcedDown);
 
         if (vt === "SPORTS_CAR") {
           if (effectiveSalePrice > effectiveAvgPrice) {
@@ -603,7 +630,12 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       const unitsProduced = Math.round(run.units * capacityScale);
       const reliabilityScore = calcs.reliabilityByModelId[model.id] ?? 1.0;
       const fleetRepairRate = computeFleetRepairRate(model.vehicleType, reliabilityScore);
-      const recallTier = getRecallTier(fleetRepairRate);
+      let recallTier = getRecallTier(fleetRepairRate);
+      // Heavy Duty Platform: trucks get at most one recall tier lower (critical→major, major→minor)
+      if (model.vehicleType === "TRUCK" && calcs.allRdUnlocks.includes("heavy_duty_platform")) {
+        if (recallTier === "critical") recallTier = "major";
+        else if (recallTier === "major") recallTier = "minor";
+      }
       const unitCost = calcs.effectiveUnitCostByModelId[model.id] ?? 0;
       const salePrice = prodModel.salePrice;
 
@@ -783,9 +815,16 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       brandPerceptionCurrent: brandPerceptionStart,
     });
 
+    // Family Safety Package: +4 brand perception per round when selling SUVs
+    let familySafetyBonus = 0;
+    if (calcs.allRdUnlocks.includes("family_safety_package")) {
+      const soldAnySuv = modelResults.some((mr) => mr.vehicleType === "SUV" && mr.unitsSold > 0);
+      if (soldAnySuv) familySafetyBonus = 4;
+    }
+
     const brandPerceptionEnd = Math.max(
       -100,
-      Math.min(100, brandPerceptionStart + brandDelta.total)
+      Math.min(100, brandPerceptionStart + brandDelta.total + familySafetyBonus)
     );
 
     // Scarcity impacts summary
@@ -1033,6 +1072,17 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     updatedTeamSpaces[team.teamId] = calcs?.spaceCostResult.newOwnedFacilities ?? team.currentFacilities;
   }
 
+  // Track consecutive crowded rounds per segment for next-round quality ratchet
+  const updatedCrowdingRounds: Record<string, number> = { ...(segmentCrowdingRounds ?? {}) };
+  for (const vt of VEHICLE_TYPES) {
+    const count = crowdingResult.teamCountByType[vt];
+    if (count >= 2) {
+      updatedCrowdingRounds[vt] = (updatedCrowdingRounds[vt] ?? 0) + 1;
+    } else {
+      updatedCrowdingRounds[vt] = 0; // reset when segment clears
+    }
+  }
+
   // Demand by type (totals for next round)
   const nextDemandByType: Record<string, number> = {};
   for (const vt of VEHICLE_TYPES) {
@@ -1220,6 +1270,7 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       demandByType: nextDemandByType,
       demandByTypeByRegion: nextDemandByTypeByRegion,
       perceptionPolicyBonusPending: perceptionPolicyBonus,
+      segmentCrowdingRounds: updatedCrowdingRounds,
     },
     newCashByTeam,
   };
@@ -1258,6 +1309,7 @@ function buildEmptyOutput(input: ResolveRoundInput): ResolveRoundOutput {
       demandByType: {},
       demandByTypeByRegion: {},
       perceptionPolicyBonusPending: 0,
+      segmentCrowdingRounds: input.segmentCrowdingRounds ?? {},
     },
     newCashByTeam: {},
   };
@@ -1354,6 +1406,7 @@ function buildZeroDemandOutput(input: ResolveRoundInput): ResolveRoundOutput {
       demandByType: {},
       demandByTypeByRegion: {},
       perceptionPolicyBonusPending: 0,
+      segmentCrowdingRounds: input.segmentCrowdingRounds ?? {},
     },
     newCashByTeam: Object.fromEntries(input.teams.map((t) => [t.teamId, t.cash])),
   };

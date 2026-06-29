@@ -7,9 +7,11 @@ import {
   SCARCITY_TRIPLE_TESTED_TIER2_COST,
   SCARCITY_MASS_PRODUCED_TIER1_UNITS,
   SCARCITY_MASS_PRODUCED_TIER1_COST,
+  CROWDING_2_TEAMS_MKT_PENALTY,
   CROWDING_3_TEAMS_MKT_PENALTY,
   CROWDING_4PLUS_TEAMS_MKT_PENALTY,
-  CROWDING_4PLUS_PRICE_REDUCTION,
+  CROWDING_PRICE_COMPRESSION_PER_BRAND,
+  CROWDING_PRICE_COMPRESSION_CAP,
   GLUT_DISCOUNT_COEFFICIENT,
   TALENT_WAR_THRESHOLD,
   TALENT_WAR_PENALTY_RATE,
@@ -125,14 +127,17 @@ export function computeSegmentCrowding(teams: TeamInput[]): CrowdingResult {
     const n = countByType[vt];
     if (n >= 4) {
       marketingFactor[vt] = CROWDING_4PLUS_TEAMS_MKT_PENALTY;
-      priceForcedDown[vt] = CROWDING_4PLUS_PRICE_REDUCTION;
     } else if (n === 3) {
       marketingFactor[vt] = CROWDING_3_TEAMS_MKT_PENALTY;
-      priceForcedDown[vt] = 0;
+    } else if (n === 2) {
+      marketingFactor[vt] = CROWDING_2_TEAMS_MKT_PENALTY;
     } else {
       marketingFactor[vt] = 1.0;
-      priceForcedDown[vt] = 0;
     }
+    // Progressive price compression: each brand beyond the first squeezes 5% (capped at 25%)
+    priceForcedDown[vt] = n >= 2
+      ? Math.min(CROWDING_PRICE_COMPRESSION_CAP, (n - 1) * CROWDING_PRICE_COMPRESSION_PER_BRAND)
+      : 0;
   }
 
   return {

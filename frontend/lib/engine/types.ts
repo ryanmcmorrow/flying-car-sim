@@ -63,6 +63,8 @@ export interface ResolveRoundInput {
   teamSpaces: Record<string, Array<{ region: string; size: string }>>;
   // perception policy bonus pending from last round
   perceptionPolicyBonusPending: number;
+  // how many consecutive rounds each segment has been crowded (≥2 brands)
+  segmentCrowdingRounds?: Record<string, number>;
 }
 
 // ── Output from resolveRound ──────────────────────────────────────────────────
@@ -233,6 +235,7 @@ export interface ResolveRoundOutput {
     demandByType: Record<string, number>;
     demandByTypeByRegion: Record<string, Record<string, number>>;
     perceptionPolicyBonusPending: number;
+    segmentCrowdingRounds: Record<string, number>;
   };
   newCashByTeam: Record<string, string>;
 }

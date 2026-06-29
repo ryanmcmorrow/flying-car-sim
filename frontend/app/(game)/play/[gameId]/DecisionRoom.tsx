@@ -723,6 +723,7 @@ export function DecisionRoom({
                   value={vehicleSection}
                   onChange={handleVehicleChange}
                   disabled={isLocked}
+                  roundNumber={round.roundNumber}
                 />
               ) : (
                 <div>

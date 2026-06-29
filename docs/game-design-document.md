@@ -1,5 +1,7 @@
 # Flying Car Business Simulator — Game Design Document
-*Last updated: 2026-06-20 (Sprint 0 rev 3)*
+*Last updated: 2026-06-29 (post-Sprint 9 playtest revision)*
+
+> **Sync status:** Live engine is the source of truth for numbers. Where the doc and engine diverge, the engine wins. Divergences noted below with ⚠.
 
 ---
 
@@ -44,7 +46,9 @@ Designed for self-organized play among friends or colleagues — no external adm
 | Segment | Annual Units | Notes |
 |---|---|---|
 | Traditional cars (total US) | 18,000,000 | NPC adversary; declines as flying cars grow |
-| Flying cars (base, Year 1) | 300,000 | ~Tesla-scale at launch |
+| Flying cars (base, Year 1) | **~60,000** | Scaled with team count — see note below |
+
+> **⚠ Scale change:** The live engine scales Year 1 flying car demand with the number of teams. A single team's small factory (~5K units) fills roughly one segment in one region. The 300K figure in the original design assumed a full 5-team game; the engine now computes a per-team share so any game size is viable.
 
 ### 2.2 Traditional Car Lobby (NPC Pressure)
 
@@ -244,7 +248,26 @@ Decisions are submitted **once per round**. Each round represents one fiscal yea
 
 ### 5.1 Car Design
 
-Teams can design one or more car models. A model persists year to year but can be updated (internals, features, pricing) each round without a full redesign fee. A full redesign (new type) costs a one-time engineering fee.
+Teams design one or more car models. The fleet management flow differs between Year 1 and Year 2+:
+
+**Year 1:** No vehicles yet. Teams create vehicle lines from scratch via the full design form. Each new vehicle type incurs a one-time engineering fee at resolve.
+
+**Year 2+:** Last year's fleet appears as locked "CONTINUING" cards — the models are auto-carried forward with `isNewDesign: false` (no re-engineering fee). From each inherited vehicle, the team can:
+
+- **Keep as-is:** Leave the card locked. Produces the same spec as last year. No fee. However, models that aren't refreshed accumulate a **model age demand penalty** (see §6.x).
+- **⟳ Refresh this model:** Unlocks the card for editing — can change engine, internals, features, and name. Vehicle segment is locked (no platform switch without full redesign). No re-engineering fee. Refreshing resets the model age penalty.
+- **+ New Vehicle Line:** Create a brand-new model on a different platform. Full engineering fee applies.
+
+**Model age staleness:** Consumer perception of an aging unchanged model degrades demand year-over-year:
+
+| Model age (rounds since last design/refresh) | Demand penalty |
+|---|---|
+| 0 (designed or refreshed this year) | None |
+| 1 | −5% |
+| 2 | −12% |
+| 3+ | −20% |
+
+This creates a recurring investment dynamic: teams must occasionally refresh vehicles to maintain demand, even if the specs are fine. The penalty is applied to the model's demand score in the allocation engine.
 
 **Flying cars only.** Traditional cars are NPC adversaries, not a player option.
 
@@ -406,10 +429,23 @@ Teams do not see the full tech tree at game start — the menu reveals available
 
 ---
 
+**Tier 2 — Segment Platform Investments** *(no tree prerequisites; available from Year 1; first-mover exclusivity applies)*
+
+These are lateral bets on specific vehicle categories. Each is in the "segment" tree — you may buy at most one per round. They are permanently exclusive for one round after first purchase.
+
+| Unlock | Cost | Effect | Segment |
+|---|---|---|---|
+| Urban Mobility Suite | $6M | Compact unit manufacturing cost −12% | Compact |
+| Luxury Chassis Platform | $12M | SUV + Sports Car quality score +15%; price compression from crowding reduced to 35% of normal | SUV, Sports Car |
+| Heavy Duty Platform | $10M | Truck unit cost −15%; any recall downgrades one tier (critical→major, major→minor) | Truck |
+| Performance Engineering | $14M | Sports Car quality score +25% — largest per-model demand multiplier in the game | Sports Car |
+| Family Safety Package | $8M | +4 brand perception per round you sell SUVs (compounds) | SUV |
+
 **Notes:**
 - The cross-path requirements for Tier 4 pinnacle unlocks (Full Autonomy Certification, Market Dominance System) force teams to invest across multiple paths rather than going deep on one. These are the hardest unlocks in the game to reach.
 - Manufacturing efficiency stages are the only repeatable investment in the tech tree — each stage must be purchased before the next is available.
 - All-Electric Drivetrain is required for Full Autonomy Certification, making the green tech path a prerequisite for the highest-demand product in the game. Teams that skip it cannot reach the pinnacle.
+- Segment platform investments are lateral — they do not chain into Tier 3/4. They are point-in-time bets that reward early segment commitment.
 
 ---
 
@@ -841,15 +877,31 @@ If five teams race to triple-tested parts at scale, costs spike for all of them.
 
 ### 11.2 Segment Crowding
 
-When too many teams target the same vehicle type, the market gets noisy and brand signals cancel out.
+When too many teams target the same vehicle type, the market gets noisy and brand signals cancel out. Effects are now **progressive** — each additional competitor adds more pressure.
 
-| Teams in same type segment | Effect |
+| Teams in segment | Marketing effectiveness | Price forced down |
+|---|---|---|
+| 1 (monopoly) | 100% + **+10% demand bonus** | 0% — full pricing power |
+| 2 | 95% | 5% |
+| 3 | 85% | 10% |
+| 4 | 70% | 15% |
+| 5+ | 70% (cap) | 20% (cap) |
+
+**Monopoly demand bonus:** When exactly one brand competes in a segment, they receive a +10% demand multiplier — representing pricing power and category ownership.
+
+**Price compression** is applied to each team's effective sale price before the relative demand calculation. Teams with the **Luxury Chassis Platform** R&D unlock receive only 35% of the normal price compression (they maintain premium positioning better under crowding).
+
+**Quality ratchet:** Segments that have been crowded for multiple consecutive rounds raise consumer expectations. Mass-produced vehicles take an increasing demand penalty in mature crowded markets:
+
+| Consecutive crowded rounds | Mass-produced penalty |
 |---|---|
-| 1–2 | No penalty |
-| 3 | Brand marketing 15% less effective in that segment |
-| 4+ | Brand marketing 30% less effective + segment avg price forced down 8% |
+| 0 | None |
+| 1–2 | −12% demand |
+| 3+ | −25% demand |
 
-Crowding compounds on top of the natural demand scarcity from sharing a fixed market. The team that finds an underserved segment earns a clean competitive signal. Six teams building compacts is a race to the bottom.
+This creates a "race to the bottom" dynamic that players must respond to by either upgrading internals, moving to a new segment, or relying on R&D quality boosts. The counter-bet: if you're the only brand willing to stay in a crowded segment long-term (and your competitors leave), the monopoly bonus kicks in.
+
+Crowding accumulates over rounds and resets to 0 if the segment drops below 2 brands.
 
 ### 11.3 Regional Overproduction (Market Glut)
 
@@ -993,7 +1045,69 @@ The leaderboard (Valuation, Revenue, CAGR, Market Share, Brand Score) publishes 
 | Sprint 4 | Decision submission UI (all 5 role sections) | ✅ Done |
 | Sprint 5 | Simulation engine (demand allocation, financials, round resolution, all 5 scarcity mechanics) | ✅ Done |
 | Sprint 6 | Results & dashboards (round report, leaderboard, team financials, visual analytics) | ✅ Done |
-| Sprint 7 | Party mode (host flow, countdown timer, auto-resolve) + Classroom mode (facilitator round control, kick, debrief tools) | ✅ Done |
+| Sprint 7 | Party mode (host flow, countdown timer, auto-resolve) + Classroom mode (facilitator dashboard, round control, kick, debrief tools) | ✅ Done |
 | Sprint 8 | World events system (full event pool, policy weighting, lobbying steering) | ✅ Done |
 | Sprint 9 | End-game leaderboard (/final), absolute demand price curves, market-clearing price, research intel payoffs, capacity enforcement, tech-tree one-per-tree-per-round | ✅ Done |
-| Sprint 9 | Deploy & playtest | Pending |
+| Sprint 9.5 | Playtest polish: results page competitor sales, scatter plot, factory map, recall badge, demand narrative, carry-over bugs | ✅ Done |
+| Sprint 10 | Competitive dynamics: progressive crowding, monopoly bonus, quality ratchet, 5 segment R&D platform unlocks, model carry-over/refresh/age staleness | ✅ Done |
+| — | Deploy & playtest | Pending |
+
+---
+
+## 14. Live Implementation Status
+
+This section is the authoritative record of what's built, what diverges from the GDD, and what's not yet implemented. Updated after each sprint.
+
+### ✅ Fully Implemented (matches GDD intent)
+
+- Full 5-role decision system (CEO/CFO/CMO/CTO/COO), role-gating, CEO-only submit
+- Classroom mode (facilitator dashboard, round control, kick players, AI standby players)
+- Party mode (host-player hybrid, countdown timer, auto-resolve on timer or all-submitted)
+- 5 vehicle types × 5 regions demand allocation (brand × price × quality × marketing score)
+- All 5 original scarcity mechanics: parts supply, segment crowding, regional glut, R&D first-mover exclusivity, talent war
+- Tech tree: 4 standard tiers + 1 segment tier, 21 one-time unlocks, cross-path prereqs for Tier 4, one-per-tree-per-round
+- Recurring R&D: marketing effectiveness, part dependability, pricing research, competitor research
+- World events: full pool, policy-weighted draw, lobbying steering
+- Round report: industry trade publication format, competitor sales table, leaderboard, per-team financials
+- End-game leaderboard (/final): cash trajectory chart, superlatives (Best Year / Most Units / Strongest Brand), final ranking
+- Results page analytics: Price vs. Units Sold scatter plot, Industry Factory Map, expandable chart mode
+- CRITICAL/MAJOR/MINOR RECALL badge with expandable detail panel
+- Relative demand narrative: % change vs. prior period (not absolute numbers)
+- Policy/lobbying: −20 to +20 scale, NPC lobby −3/year, diminishing returns above $5M
+
+### ✅ Added Post-GDD (live in engine)
+
+| Feature | Description |
+|---|---|
+| 5 segment platform R&D unlocks | Urban Mobility Suite (Compact −12%), Luxury Chassis (SUV/Sports quality +15%, price relief), Heavy Duty Platform (Truck −15%, recall downgrade), Performance Engineering (Sports quality +25%), Family Safety Package (SUV brand +4/round) |
+| Progressive price compression | (N−1)×5% per brand in segment (cap 25%). Replaces flat 8% at 4+ brands. |
+| Monopoly demand bonus | +10% demand when sole brand in segment — rewards doubling down on uncrowded bets |
+| Quality ratchet | Mass-produced gets −12%/−25% demand in segments crowded 1–2/3+ consecutive rounds |
+| Model age staleness | Unchanged models lose −5%/−12%/−20% demand at 1/2/3+ years old; ⟳ Refresh resets clock |
+| Vehicle carry-over/refresh UX | Year 2+ shows inherited fleet as locked cards; players refresh (partial edit, no fee) or add new vehicle lines (full fee) |
+| Competitor sales table in results | All teams' models shown: type, sale price, produced, sold — public industry intel |
+| Factory location map in results | Pixel art map of all teams' facilities by region, sized by capacity |
+| AI players | Facilitator-configurable AI standbys; AI submits plausible decisions each round |
+| Absolute demand price curves | Industry-avg price vs. per-type band shrinks or boosts total market pool |
+| Market-clearing price (pricing research payoff) | Per-model per-region clearing price returned to teams that bought Pricing Research |
+
+### ⚠ GDD Describes, Engine Diverges
+
+| GDD Spec | Live Engine | Notes |
+|---|---|---|
+| Year 1 demand: 300K national | ~60K, scaled with team count | Design intent preserved — per-team share is comparable regardless of team count |
+| R&D exclusivity window: 2 rounds | 1 round (`EXCLUSIVITY_WINDOW = 1`) | Pioneer advantage exists but shorter |
+| Marketing share: linear per-segment divide | sqrt curve + crowding factor | Prevents marketing arms race; diminishing returns |
+| Company Valuation Score as final ranking | Live leaderboard uses cash balance + revenue | Valuation formula not yet wired up |
+
+### ❌ Not Yet Implemented
+
+| Feature | Notes |
+|---|---|
+| Company Valuation Score (net income × growth multiplier + cash + assets − debt + brand) | Leaderboard is cash/revenue proxy; full PE × CAGR formula pending |
+| CAGR column on live leaderboard | Data exists; UI column not surfaced |
+| Technology licensing between teams | Phase 2 |
+| Demand Forecasting AI forward-forecast delivery | Unlock purchased correctly; the in-game forecast delivery UI not built |
+| Government fleet contract bidding UI | World event fires narrative; bidding mechanic not implemented |
+| Rebranding mechanic | Not built |
+| Profanity filter on brand/model names | Not implemented |
