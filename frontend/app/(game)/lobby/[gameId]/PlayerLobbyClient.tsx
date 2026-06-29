@@ -63,10 +63,12 @@ function segmentDemandLabel(n: number): { label: string; color: string } {
 
 export function PlayerLobbyClient({ gameData: initial }: Props) {
   const introKey = `intro-seen-${initial.id}`;
-  const [showIntro, setShowIntro] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !sessionStorage.getItem(`intro-seen-${initial.id}`);
-  });
+  // sessionStorage is unavailable during SSR — use effect to check after mount
+  const [showIntro, setShowIntro] = useState(false);
+  useEffect(() => {
+    if (!sessionStorage.getItem(introKey)) setShowIntro(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [gameData, setGameData] = useState<GameData>(initial);
   const [showTransmission, setShowTransmission] = useState(
     initial.status === "ACTIVE"
