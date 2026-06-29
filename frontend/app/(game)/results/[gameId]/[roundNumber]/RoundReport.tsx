@@ -100,6 +100,282 @@ function USRegionMap({ regions, total }: {
   );
 }
 
+// ── Industry charts ──────────────────────────────────────────────────────────
+
+const VEHICLE_TYPE_COLORS: Record<string, string> = {
+  COMPACT:    "#00f5ff",
+  SEDAN:      "#39ff14",
+  SUV:        "#ffbe0b",
+  SPORTS_CAR: "#ff006e",
+  TRUCK:      "#ff7c00",
+};
+const BRAND_PALETTE = ["#00f5ff", "#39ff14", "#ff006e", "#ffbe0b", "#ff7c00", "#c77dff"];
+
+type ScatterModel = { brandName: string; modelName: string; vehicleType: string; salePrice: number; unitsSold: number };
+
+function PriceVolumeScatter({ models }: { models: ScatterModel[] }) {
+  const px = "var(--font-pixel), monospace";
+  const body = "var(--font-pixel-body), monospace";
+  const W = 420, H = 260;
+  const ML = 52, MB = 44, MT = 14, MR = 12;
+  const pw = W - ML - MR, ph = H - MT - MB;
+
+  const prices = models.map(m => m.salePrice);
+  const units  = models.map(m => m.unitsSold);
+  const minP = Math.min(...prices, 0);
+  const maxP = Math.max(...prices, 1);
+  const maxU = Math.max(...units, 1);
+
+  function scx(price: number) { return ML + ((price - minP) / (maxP - minP)) * pw; }
+  function scy(unit: number)  { return MT + ph - (unit / maxU) * ph; }
+
+  const allTypes = [...new Set(models.map(m => m.vehicleType))].sort();
+  const xTicks = 5, yTicks = 4;
+  const tickY = MT + ph + 12;   // tick labels below axis
+  const axisLabelY = H - 4;     // axis label at very bottom
+
+  return (
+    <div>
+      <p style={{ fontFamily: px, fontSize: "0.42rem", color: "#8888aa", marginBottom: "0.4rem" }}>PRICE vs. UNITS SOLD — ALL BRANDS</p>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block", imageRendering: "pixelated" }} shapeRendering="crispEdges">
+        <rect width={W} height={H} fill="#06060f" />
+        {/* Grid + Y ticks */}
+        {Array.from({ length: yTicks + 1 }, (_, i) => {
+          const y = MT + (i / yTicks) * ph;
+          const val = Math.round(maxU * (1 - i / yTicks));
+          return (
+            <g key={i}>
+              <line x1={ML} y1={y} x2={ML + pw} y2={y} stroke="#1a1a2e" strokeWidth="1" />
+              <text x={ML - 4} y={y + 3} textAnchor="end" fontSize="6" fontFamily={body} fill="#555577">{val.toLocaleString()}</text>
+            </g>
+          );
+        })}
+        {/* Grid + X ticks */}
+        {Array.from({ length: xTicks + 1 }, (_, i) => {
+          const x = ML + (i / xTicks) * pw;
+          const val = Math.round((minP + (i / xTicks) * (maxP - minP)) / 1000);
+          return (
+            <g key={i}>
+              <line x1={x} y1={MT} x2={x} y2={MT + ph} stroke="#1a1a2e" strokeWidth="1" />
+              <text x={x} y={tickY} textAnchor="middle" fontSize="6" fontFamily={body} fill="#555577">${val}K</text>
+            </g>
+          );
+        })}
+        {/* Axes */}
+        <line x1={ML} y1={MT} x2={ML} y2={MT + ph} stroke="#2a2a4a" strokeWidth="2" />
+        <line x1={ML} y1={MT + ph} x2={ML + pw} y2={MT + ph} stroke="#2a2a4a" strokeWidth="2" />
+        {/* Axis labels */}
+        <text x={ML + pw / 2} y={axisLabelY} textAnchor="middle" fontSize="7" fontFamily={px} fill="#8888aa">SALE PRICE</text>
+        <text x={8} y={MT + ph / 2} textAnchor="middle" fontSize="7" fontFamily={px} fill="#8888aa" transform={`rotate(-90, 8, ${MT + ph / 2})`}>UNITS SOLD</text>
+        {/* Data points */}
+        {models.map((m, i) => {
+          const x = scx(m.salePrice), y = scy(m.unitsSold);
+          const col = VEHICLE_TYPE_COLORS[m.vehicleType] ?? "#888";
+          const nearRight = x > ML + pw * 0.7;
+          return (
+            <g key={i}>
+              <rect x={x - 4} y={y - 4} width={8} height={8} fill={col} opacity={0.85} />
+              <text
+                x={nearRight ? x - 6 : x + 6}
+                y={y + 3}
+                fontSize="6"
+                fontFamily={body}
+                fill={col}
+                opacity={0.9}
+                textAnchor={nearRight ? "end" : "start"}
+              >{m.brandName}</text>
+            </g>
+          );
+        })}
+      </svg>
+      {/* Legend */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem 1rem", marginTop: "0.35rem" }}>
+        {allTypes.map(vt => (
+          <span key={vt} style={{ fontFamily: body, fontSize: "0.8rem", color: VEHICLE_TYPE_COLORS[vt] ?? "#888" }}>
+            ■ {vt.replace(/_/g, " ")}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type FacilityEntry = { region: string; size: string };
+type TeamFactory = { teamId: string; brandName: string; facilities: FacilityEntry[] };
+
+function IndustryFactoryMap({ teamFactories }: { teamFactories: TeamFactory[] }) {
+  const px = "var(--font-pixel), monospace";
+  const body = "var(--font-pixel-body), monospace";
+
+  const FACTORY_RADIUS: Record<string, number> = { small: 5, medium: 8, large: 11 };
+
+  // Assign each team a color
+  const brandColor: Record<string, string> = {};
+  teamFactories.forEach((t, i) => { brandColor[t.teamId] = BRAND_PALETTE[i % BRAND_PALETTE.length]; });
+
+  // Group factories by region
+  const byRegion: Record<string, Array<{ teamId: string; brandName: string; size: string }>> = {};
+  for (const team of teamFactories) {
+    for (const fac of team.facilities) {
+      (byRegion[fac.region] ??= []).push({ teamId: team.teamId, brandName: team.brandName, size: fac.size });
+    }
+  }
+
+  return (
+    <div>
+      <p style={{ fontFamily: px, fontSize: "0.42rem", color: "#8888aa", marginBottom: "0.4rem" }}>FACTORY LOCATIONS — ALL BRANDS</p>
+      <svg viewBox="0 0 424 224" style={{ width: "100%", display: "block", imageRendering: "pixelated" }} shapeRendering="crispEdges">
+        <rect width="424" height="224" fill="#06060f" />
+        {REGION_CELLS.map((cell) => {
+          const factories = byRegion[cell.id] ?? [];
+          const hasAny = factories.length > 0;
+          const cx = cell.x + cell.w / 2;
+          const cy = cell.y + cell.h / 2;
+          const lines = cell.label.split("\n");
+          return (
+            <g key={cell.id}>
+              <rect x={cell.x + 2} y={cell.y + 2} width={cell.w - 4} height={cell.h - 4}
+                fill={hasAny ? "rgba(255,255,255,0.03)" : "#0a0a18"}
+                stroke={hasAny ? "#2a2a4a" : "#111122"} strokeWidth="2" />
+              {lines.map((line, i) => (
+                <text key={i} x={cx} y={cy - (lines.length === 2 ? 28 - i * 12 : 22)}
+                  textAnchor="middle" fontSize="6" fontFamily={px}
+                  fill={hasAny ? "#555577" : "#1e1e36"}>
+                  {line}
+                </text>
+              ))}
+              {/* Factory markers spread across region center */}
+              {factories.map((fac, fi) => {
+                const r = FACTORY_RADIUS[fac.size] ?? 5;
+                const spread = (factories.length - 1) * 14;
+                const fx = cx - spread / 2 + fi * 14;
+                const fy = cy + (lines.length === 2 ? 8 : 4);
+                const col = brandColor[fac.teamId] ?? "#888";
+                return (
+                  <g key={fi}>
+                    <rect x={fx - r} y={fy - r} width={r * 2} height={r * 2} fill={col} opacity={0.9} />
+                    <text x={fx} y={fy + r + 7} textAnchor="middle" fontSize="5" fontFamily={body} fill={col}>
+                      {fac.brandName.slice(0, 6)}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
+      </svg>
+      {/* Legend */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem 1rem", marginTop: "0.35rem" }}>
+        {teamFactories.map(t => (
+          <span key={t.teamId} style={{ fontFamily: body, fontSize: "0.8rem", color: brandColor[t.teamId] }}>
+            ■ {t.brandName}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const RECALL_DETAILS: Record<string, { headline: string; detail: string }> = {
+  critical: {
+    headline: "CRITICAL SAFETY DEFECT",
+    detail: "A critical defect was discovered in your vehicles. A mandatory NHTSA recall is issued to all affected owners. Repair costs are applied, and your brand perception takes a heavy hit this round.",
+  },
+  major: {
+    headline: "MAJOR SAFETY CONCERN",
+    detail: "A significant safety issue was found. A mandatory recall was issued for affected units. Repair costs apply and brand perception is damaged.",
+  },
+  minor: {
+    headline: "MINOR QUALITY ISSUE",
+    detail: "A minor defect was identified and a precautionary recall issued. Costs are small but the public notice affects your brand perception slightly.",
+  },
+};
+
+function RecallBadge({ tier, pxFont, bodyFont }: { tier: string; pxFont: string; bodyFont: string }) {
+  const [open, setOpen] = useState(false);
+  const info = RECALL_DETAILS[tier] ?? RECALL_DETAILS.minor;
+  return (
+    <div style={{ display: "inline-block" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="px-2 py-1 text-xs border"
+        style={{
+          fontFamily: pxFont,
+          fontSize: "0.45rem",
+          borderColor: "#ff006e",
+          color: "#ff006e",
+          background: open ? "rgba(255,0,110,0.18)" : "rgba(255,0,110,0.1)",
+          cursor: "pointer",
+        }}
+      >
+        {tier.toUpperCase()} RECALL ▾
+      </button>
+      {open && (
+        <div style={{ marginTop: "0.35rem", padding: "0.5rem 0.75rem", background: "rgba(255,0,110,0.07)", border: "1px solid #ff006e", maxWidth: 360 }}>
+          <p style={{ fontFamily: pxFont, fontSize: "0.4rem", color: "#ff006e", marginBottom: "0.25rem" }}>{info.headline}</p>
+          <p style={{ fontFamily: bodyFont, fontSize: "0.85rem", color: "#cc7788", lineHeight: 1.5 }}>{info.detail}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function IndustryChartsSection({ scatterModels, teamFactories }: { scatterModels: ScatterModel[] | null; teamFactories: TeamFactory[] | null }) {
+  const px = "var(--font-pixel), monospace";
+  const [expandedScatter, setExpandedScatter] = useState(false);
+  const [expandedFactory, setExpandedFactory] = useState(false);
+
+  const both = scatterModels && teamFactories;
+  if (!scatterModels && !teamFactories) return null;
+
+  const btnStyle = {
+    fontFamily: px, fontSize: "0.38rem", color: "#555577",
+    background: "none", border: "1px solid #2a2a4a", padding: "0.15rem 0.4rem",
+    cursor: "pointer",
+  };
+
+  // Side-by-side or full-width depending on expand state
+  if (both && !expandedScatter && !expandedFactory) {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.5rem" }}>
+        <div className="pixel-card" style={{ borderColor: "#2a2a4a", padding: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.25rem" }}>
+            <button style={btnStyle} onClick={() => setExpandedScatter(true)}>⤢ EXPAND</button>
+          </div>
+          <PriceVolumeScatter models={scatterModels} />
+        </div>
+        <div className="pixel-card" style={{ borderColor: "#2a2a4a", padding: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.25rem" }}>
+            <button style={btnStyle} onClick={() => setExpandedFactory(true)}>⤢ EXPAND</button>
+          </div>
+          <IndustryFactoryMap teamFactories={teamFactories} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: "1.5rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+      {scatterModels && (
+        <div className="pixel-card" style={{ borderColor: "#2a2a4a", padding: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.25rem" }}>
+            <button style={btnStyle} onClick={() => setExpandedScatter(false)}>⤡ {expandedScatter ? "COLLAPSE" : "EXPAND"}</button>
+          </div>
+          <PriceVolumeScatter models={scatterModels} />
+        </div>
+      )}
+      {teamFactories && (
+        <div className="pixel-card" style={{ borderColor: "#2a2a4a", padding: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.25rem" }}>
+            <button style={btnStyle} onClick={() => setExpandedFactory(false)}>⤡ {expandedFactory ? "COLLAPSE" : "EXPAND"}</button>
+          </div>
+          <IndustryFactoryMap teamFactories={teamFactories} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Per-model regional breakdown ──────────────────────────────────────────────
 const REGION_LABELS: Record<RegionKey, string> = {
   WEST_COAST: "WEST COAST",
@@ -160,14 +436,16 @@ function ModelRegionMap({ byRegion }: { byRegion: NonNullable<TeamResultData["mo
                   ))}
                   <text x={midX} y={midY + 4} textAnchor="middle"
                     fill={stroke} style={{ fontFamily: px, fontSize: "8px" }}>
-                    {sold.toLocaleString()}
+                    {sold.toLocaleString()} sold
                   </text>
-                  <text x={midX} y={midY + 16} textAnchor="middle"
-                    fill="#888" style={{ fontFamily: body, fontSize: "8px" }}>
-                    of {demanded.toLocaleString()} dem
-                  </text>
+                  {allocated > sold && (
+                    <text x={midX} y={midY + 15} textAnchor="middle"
+                      fill="#ffbe0b" style={{ fontFamily: body, fontSize: "7px" }}>
+                      {(allocated - sold).toLocaleString()} leftover
+                    </text>
+                  )}
                   {!hasFactory && (
-                    <text x={midX} y={midY + 28} textAnchor="middle"
+                    <text x={midX} y={midY + (allocated > sold ? 26 : 17)} textAnchor="middle"
                       fill="#ff006e" style={{ fontFamily: px, fontSize: "6px" }}>
                       ⚠ SHIP
                     </text>
@@ -478,6 +756,7 @@ interface RoundReportProps {
   }>;
   rdUnlocks?: string[];
   priorDemand?: number;
+  teamFactories?: TeamFactory[];
 }
 
 function fmt(n: number): string {
@@ -589,7 +868,7 @@ function TradeReport({ snap, roundNumber, priorDemand, allTeamResults }: {
 
   // Recalls
   for (const recall of snap.recalls ?? []) {
-    const severity = recall.tier === "major" ? "Major" : recall.tier === "minor" ? "Minor" : "Voluntary";
+    const severity = recall.tier === "critical" ? "Critical" : recall.tier === "major" ? "Major" : recall.tier === "minor" ? "Minor" : "Voluntary";
     blurbs.push({
       tag: "SAFETY",
       headline: `${recall.brandName} Issues ${severity} Recall — ${recall.vehicleType.replace(/_/g, " ")} Line Affected`,
@@ -873,6 +1152,7 @@ export function RoundReport({
   allTeamResults,
   rdUnlocks = [],
   priorDemand,
+  teamFactories,
 }: RoundReportProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("pl");
@@ -1038,6 +1318,25 @@ export function RoundReport({
 
       {/* Industry Trade Report */}
       <TradeReport snap={snap} roundNumber={roundNumber} priorDemand={priorDemand ?? snap.totalFlyingCarDemand} allTeamResults={allTeamResults} />
+
+      {/* Industry charts — scatter + factory map */}
+      {allTeamResults && allTeamResults.length > 0 && (() => {
+        const scatterModels: ScatterModel[] = [];
+        for (const entry of allTeamResults) {
+          const tr2 = entry.teamResult as { modelResults?: Array<{ modelName: string; vehicleType: string; salePrice: number; unitsSold: number }> } | null;
+          for (const m of tr2?.modelResults ?? []) {
+            if (m.salePrice > 0) scatterModels.push({ brandName: entry.brandName, modelName: m.modelName, vehicleType: m.vehicleType, salePrice: m.salePrice, unitsSold: m.unitsSold });
+          }
+        }
+        const hasScatter = scatterModels.length > 0;
+        const hasFactory = (teamFactories?.length ?? 0) > 0;
+        return (
+          <IndustryChartsSection
+            scatterModels={hasScatter ? scatterModels : null}
+            teamFactories={hasFactory ? teamFactories! : null}
+          />
+        );
+      })()}
 
       {/* Policy + Perception */}
       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -1283,18 +1582,7 @@ export function RoundReport({
                       </p>
                     </div>
                     {mr.recallTier !== "none" && (
-                      <span
-                        className="px-2 py-1 text-xs border"
-                        style={{
-                          fontFamily: pxFont,
-                          fontSize: "0.45rem",
-                          borderColor: "#ff006e",
-                          color: "#ff006e",
-                          background: "rgba(255,0,110,0.1)",
-                        }}
-                      >
-                        {mr.recallTier.toUpperCase()} RECALL
-                      </span>
+                      <RecallBadge tier={mr.recallTier} pxFont={pxFont} bodyFont={bodyFont} />
                     )}
                   </div>
 

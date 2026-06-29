@@ -148,6 +148,17 @@ export default async function ResultsPage({ params }: PageProps) {
     );
   }
 
+  // Factory locations from game settings (current state after most recent resolve)
+  type FacilityEntry = { region: string; size: string };
+  const teamSpacesRaw = ((game.settings as Record<string, unknown>).teamSpaces ?? {}) as Record<string, FacilityEntry[]>;
+  const teamFactories = Object.entries(teamSpacesRaw)
+    .map(([tId, facs]) => ({
+      teamId: tId,
+      brandName: game.teams.find((t) => t.id === tId)?.brandName ?? tId,
+      facilities: Array.isArray(facs) ? facs : [],
+    }))
+    .filter((t) => t.facilities.length > 0);
+
   return (
     <RoundReport
       gameId={gameId}
@@ -162,6 +173,7 @@ export default async function ResultsPage({ params }: PageProps) {
       allTeamResults={allTeamResults.length > 0 ? allTeamResults : undefined}
       rdUnlocks={rdUnlocks}
       priorDemand={priorDemand}
+      teamFactories={teamFactories}
     />
   );
 }
