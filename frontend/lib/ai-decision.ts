@@ -84,8 +84,8 @@ const RD_PROGRESSION: Record<AiDifficulty, string[][]> = {
 
 const RECURRING_BY_ROUND: Record<AiDifficulty, (round: number) => Partial<Record<string, boolean>>> = {
   EASY:   () => ({}),
-  MEDIUM: (r) => r >= 3 ? { marketResearch: true } : {},
-  HARD:   (r) => r >= 2 ? { pricingResearch: true, marketResearch: true } : {},
+  MEDIUM: () => ({}),
+  HARD:   (r) => r >= 2 ? { pricingResearch: true } : {},
 };
 
 // ── Strategy presets ──────────────────────────────────────────────────────────
@@ -195,7 +195,6 @@ export function generateAiDecision(input: AiDecisionInput): AiDecisionOutput {
       partDependability: false,
       pricingResearch: recurringFlags.pricingResearch === true,
       competitorResearch: false,
-      marketResearch: recurringFlags.marketResearch === true,
     },
     recurringTargets: {},
     techTreeUnlocks: newUnlocks,

@@ -3,13 +3,6 @@
 import { Tooltip } from "@/components/game/Tooltip";
 import type { MarketingSection as MarketingSectionType } from "@/types/decisions";
 
-const CHANNEL_MINIMUMS: Record<string, number> = {
-  tv_online: 2_000_000,
-  radio: 500_000,
-  print: 300_000,
-  paid_search: 800_000,
-};
-
 const CHANNEL_LABELS: Record<string, string> = {
   tv_online: "TV / ONLINE",
   radio: "RADIO",
@@ -18,10 +11,10 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 const CHANNEL_NOTES: Record<string, string> = {
-  tv_online: "Reaches the widest audience — commuters, families, thrill-seekers. Strong for aspirational and luxury buyers. Min $2M",
-  radio: "Reaches practical, regional buyers — tradespeople, commuters, rural markets. Min $500K",
-  print: "Reaches affluent, high-consideration buyers who research big purchases. Enthusiast press and luxury lifestyle. Min $300K",
-  paid_search: "Reaches buyers actively shopping now — price-conscious, comparison-driven. Best for value segments. Min $800K",
+  tv_online: "Reaches the widest audience — commuters, families, thrill-seekers. Strong for aspirational and luxury buyers.",
+  radio: "Reaches practical, regional buyers — tradespeople, commuters, rural markets.",
+  print: "Reaches affluent, high-consideration buyers who research big purchases. Enthusiast press and luxury lifestyle.",
+  paid_search: "Reaches buyers actively shopping now — price-conscious, comparison-driven. Best for value segments.",
 };
 
 const EVENT_CATEGORIES = [
@@ -60,7 +53,7 @@ export function MarketingSection({
   disabled?: boolean;
 }) {
   const channelTotal = Object.values(value.channels).reduce((s, v) => s + v, 0);
-  const overBudget = channelTotal > value.totalBudget && value.totalBudget > 0;
+  const overBudget = channelTotal > 100;
   const regionalTotal = value.regionalBudgetSplit
     ? REGIONS.reduce((s, r) => s + (value.regionalBudgetSplit![r] ?? 0), 0)
     : 100;
@@ -193,90 +186,58 @@ export function MarketingSection({
 
       {/* Channel Allocation */}
       <div>
-        <label className="pixel-label">BRAND CHANNEL ALLOCATION ($) <Tooltip text="How your brand spend reaches buyers — each channel targets a different audience. Channels only apply to your brand spend (the portion not going to market growth above). Category spend is always national/broad." /></label>
-        <div className="space-y-3">
-          {(Object.keys(value.channels) as Array<keyof typeof value.channels>).map(
-            (ch) => {
-              const v2 = value.channels[ch];
-              const min = CHANNEL_MINIMUMS[ch];
-              const tooLow = v2 > 0 && v2 < min;
-              return (
-                <div key={ch}>
-                  <div
-                    style={{
-                      fontFamily: "var(--font-pixel)",
-                      fontSize: "0.42rem",
-                      color: "var(--px-cyan)",
-                      marginBottom: "0.2rem",
-                    }}
-                  >
-                    {CHANNEL_LABELS[ch]}
+        <label className="pixel-label">BRAND CHANNEL ALLOCATION (%) <Tooltip text="How you split your brand spend across channels — each targets a different audience. Should total 100%. Category spend is always national/broad." /></label>
+        {(() => {
+          const brandBudget = Math.round(value.totalBudget * (100 - (value.categorySplit ?? 0)) / 100);
+          return (
+            <div className="space-y-3">
+              {(Object.keys(value.channels) as Array<keyof typeof value.channels>).map((ch) => {
+                const pct = value.channels[ch];
+                const dollarEst = brandBudget > 0 ? Math.round(brandBudget * pct / 100) : 0;
+                return (
+                  <div key={ch}>
+                    <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.42rem", color: "var(--px-cyan)", marginBottom: "0.2rem" }}>
+                      {CHANNEL_LABELS[ch]}
+                    </div>
+                    <div style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-gray)", marginBottom: "0.25rem" }}>
+                      {CHANNEL_NOTES[ch]}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={pct || ""}
+                        disabled={disabled}
+                        placeholder="0"
+                        onChange={(e) => setChannel(ch, Math.min(100, parseInt(e.target.value) || 0))}
+                        className="pixel-input"
+                        style={{ maxWidth: 100 }}
+                      />
+                      <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-gray)" }}>%</span>
+                      {brandBudget > 0 && pct > 0 && (
+                        <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-amber)" }}>
+                          = {fmtM(dollarEst)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      fontFamily: "var(--font-pixel-body)",
-                      fontSize: "0.85rem",
-                      color: "var(--px-gray)",
-                      marginBottom: "0.25rem",
-                    }}
-                  >
-                    {CHANNEL_NOTES[ch]}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      value={v2 || ""}
-                      disabled={disabled}
-                      placeholder="0"
-                      onChange={(e) =>
-                        setChannel(ch, parseInt(e.target.value) || 0)
-                      }
-                      className="pixel-input"
-                      style={{ maxWidth: 160 }}
-                    />
-                    {tooLow && (
-                      <span
-                        style={{
-                          fontFamily: "var(--font-pixel)",
-                          fontSize: "0.38rem",
-                          color: "var(--px-pink)",
-                        }}
-                      >
-                        MIN {fmtM(min)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-          )}
-        </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
-        {/* Channel total vs budget */}
+        {/* Channel total */}
         <div
           className="flex items-center justify-between mt-3 p-2"
-          style={{
-            border: `2px solid ${overBudget ? "var(--px-pink)" : "var(--px-amber)"}`,
-          }}
+          style={{ border: `2px solid ${overBudget ? "var(--px-pink)" : channelTotal === 100 ? "var(--px-green)" : "var(--px-amber)"}` }}
         >
-          <span
-            style={{
-              fontFamily: "var(--font-pixel)",
-              fontSize: "0.45rem",
-              color: overBudget ? "var(--px-pink)" : "var(--px-amber)",
-            }}
-          >
-            CHANNELS vs BUDGET
+          <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.45rem", color: overBudget ? "var(--px-pink)" : channelTotal === 100 ? "var(--px-green)" : "var(--px-amber)" }}>
+            CHANNEL SPLIT
           </span>
-          <span
-            style={{
-              fontFamily: "var(--font-pixel)",
-              fontSize: "0.55rem",
-              color: overBudget ? "var(--px-pink)" : "var(--px-green)",
-            }}
-          >
-            {fmtM(channelTotal)} / {fmtM(value.totalBudget)}
+          <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.55rem", color: overBudget ? "var(--px-pink)" : channelTotal === 100 ? "var(--px-green)" : "var(--px-amber)" }}>
+            {channelTotal}% / 100%
           </span>
         </div>
       </div>

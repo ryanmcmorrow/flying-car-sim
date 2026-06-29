@@ -1,5 +1,5 @@
-// Self-check for Competitor & Market Research payoffs: intel is attached only to
-// teams that paid + named a target, and points at the right rival/region.
+// Self-check for Competitor Research payoff: intel is attached only to
+// teams that paid + named a target, and points at the right rival.
 //
 // Run: npx tsx lib/engine/__tests__/research-intel.test.ts
 
@@ -34,10 +34,9 @@ function team(id: string, brand: string): TeamInput {
 const alpha = team("A", "Alpha");
 const beta = team("B", "Beta");
 
-// Alpha buys both research products, targeting Beta + WEST_COAST.
+// Alpha buys competitor research targeting Beta.
 alpha.rdSection.recurring.competitorResearch = true;
-alpha.rdSection.recurring.marketResearch = true;
-alpha.rdSection.recurringTargets = { competitorResearch: "B", marketResearch: "WEST_COAST" };
+alpha.rdSection.recurringTargets = { competitorResearch: "B" };
 
 const out = resolveRound({
   roundNumber: 1, gameId: "g", teams: [alpha, beta], worldEvent: stableEvent,
@@ -50,16 +49,12 @@ const out = resolveRound({
 const a = out.teamResults["A"].decisions;
 const b = out.teamResults["B"].decisions;
 
-// Alpha paid → gets intel pointed at the right rival/region.
+// Alpha paid → gets intel pointed at the right rival.
 assert(a.competitorIntel, "Alpha should have competitor intel");
 assert.equal(a.competitorIntel!.brandName, "Beta", "intel names the tracked rival");
 assert.equal(typeof a.competitorIntel!.marketShare, "number");
-assert(a.marketIntel, "Alpha should have market intel");
-assert.equal(a.marketIntel!.region, "WEST_COAST");
-assert.equal(Object.keys(a.marketIntel!.demandByType).length, 5, "all 5 segments");
 
 // Beta paid for nothing → no intel leaks to it.
 assert.equal(b.competitorIntel, undefined, "unpaid team gets no competitor intel");
-assert.equal(b.marketIntel, undefined, "unpaid team gets no market intel");
 
 console.log("research-intel self-check: OK");

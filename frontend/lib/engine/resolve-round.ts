@@ -1092,14 +1092,6 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
       }
     }
 
-    if (team.rdSection.recurring.marketResearch && targets.marketResearch) {
-      const region = targets.marketResearch;
-      const demandByType: Record<string, number> = {};
-      for (const vt of VEHICLE_TYPES) {
-        demandByType[vt] = demandByTypeByRegion[vt]?.[region as Region] ?? 0;
-      }
-      result.decisions.marketIntel = { region, demandByType };
-    }
   }
 
   // Segment crowding counts

@@ -29,13 +29,11 @@ export interface RdSection {
     partDependability: boolean; // $5M
     pricingResearch: boolean; // $1M
     competitorResearch: boolean; // $2M
-    marketResearch: boolean; // $1.5M
   };
   /** Targeted focus for recurring subscriptions (which competitor/segment/region to analyze) */
   recurringTargets: {
     competitorResearch?: string; // teamId of rival to track
     pricingResearch?: string;    // vehicle type to price-analyze: COMPACT | SEDAN | SUV | SPORTS_CAR | TRUCK
-    marketResearch?: string;     // region to focus: WEST_COAST | NORTHEAST | etc.
   };
   techTreeUnlocks: string[];
   /** One-time market intel purchases: e.g. "intel_region_WEST_COAST", "intel_type_COMPACT" */

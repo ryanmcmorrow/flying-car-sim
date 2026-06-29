@@ -47,18 +47,18 @@ interface Props {
 }
 
 function totalDemandLabel(n: number): { label: string; color: string } {
-  if (n >= 400_000) return { label: "VERY STRONG", color: "#39ff14" };
-  if (n >= 250_000) return { label: "STRONG",      color: "#39ff14" };
-  if (n >= 150_000) return { label: "MODERATE",    color: "#ffbe0b" };
-  return                   { label: "WEAK",         color: "#ff006e" };
+  if (n >= 70_000) return { label: "STRONG",   color: "#39ff14" };
+  if (n >= 40_000) return { label: "MODERATE", color: "#ffbe0b" };
+  if (n >= 20_000) return { label: "TIGHT",    color: "#ff7c00" };
+  return                  { label: "SCARCE",   color: "#ff006e" };
 }
 
-function segmentDemandLabel(n: number): { label: string; color: string } {
-  if (n >= 80_000) return { label: "VERY HIGH", color: "#39ff14" };
-  if (n >= 50_000) return { label: "HIGH",      color: "#39ff14" };
-  if (n >= 30_000) return { label: "MEDIUM",    color: "#ffbe0b" };
-  if (n >= 15_000) return { label: "LOW",       color: "#ff006e" };
-  return                  { label: "MINIMAL",   color: "#8888aa" };
+function relativeSegmentLabel(rank: number): { label: string; color: string } {
+  if (rank === 0) return { label: "HOTTEST",  color: "#39ff14" };
+  if (rank === 1) return { label: "HIGH",     color: "#39ff14" };
+  if (rank === 2) return { label: "MEDIUM",   color: "#ffbe0b" };
+  if (rank === 3) return { label: "LOW",      color: "#ff7c00" };
+  return                 { label: "NICHE",    color: "#8888aa" };
 }
 
 export function PlayerLobbyClient({ gameData: initial }: Props) {
@@ -273,23 +273,30 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
           <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.55rem", color: "var(--px-amber)", marginBottom: "0.75rem" }}>
             YEAR 1 MARKET PROJECTION
           </p>
-          <div className="flex gap-3 mb-4">
-            <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(255,190,11,0.05)", border: "1px solid rgba(255,190,11,0.2)" }}>
-              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-gray)" }}>TOTAL MARKET</p>
-              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "#ffffff", marginTop: "0.2rem" }}>18.3M</p>
-              <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>vehicles / yr</p>
-            </div>
-            <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(0,245,255,0.05)", border: "1px solid rgba(0,245,255,0.2)" }}>
-              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-cyan)" }}>FLYING CARS</p>
-              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "var(--px-cyan)", marginTop: "0.2rem" }}>300K</p>
-              <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>~1.6% of market</p>
-            </div>
-            <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(136,136,170,0.05)", border: "1px solid rgba(136,136,170,0.2)" }}>
-              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-gray)" }}>COMPETITORS</p>
-              <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "#ffffff", marginTop: "0.2rem" }}>{gameData.allTeams.length}</p>
-              <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>teams in game</p>
-            </div>
-          </div>
+          {(() => {
+            const n = Math.max(1, gameData.allTeams.length);
+            const estFlying = Math.round(YEAR1_DEMAND_BY_TYPE.COMPACT * n / 4 * (1 + YEAR1_DEMAND_BY_TYPE.SEDAN / YEAR1_DEMAND_BY_TYPE.COMPACT + YEAR1_DEMAND_BY_TYPE.SUV / YEAR1_DEMAND_BY_TYPE.COMPACT + YEAR1_DEMAND_BY_TYPE.SPORTS_CAR / YEAR1_DEMAND_BY_TYPE.COMPACT + YEAR1_DEMAND_BY_TYPE.TRUCK / YEAR1_DEMAND_BY_TYPE.COMPACT));
+            const flyingK = Math.round(estFlying / 1000);
+            return (
+              <div className="flex gap-3 mb-4">
+                <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(255,190,11,0.05)", border: "1px solid rgba(255,190,11,0.2)" }}>
+                  <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-gray)" }}>TOTAL MARKET</p>
+                  <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "#ffffff", marginTop: "0.2rem" }}>18.3M</p>
+                  <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>vehicles / yr</p>
+                </div>
+                <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(0,245,255,0.05)", border: "1px solid rgba(0,245,255,0.2)" }}>
+                  <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-cyan)" }}>FLYING CARS</p>
+                  <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "var(--px-cyan)", marginTop: "0.2rem" }}>~{flyingK}K</p>
+                  <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>est. for {n} team{n !== 1 ? "s" : ""}</p>
+                </div>
+                <div style={{ flex: 1, textAlign: "center", padding: "0.5rem", background: "rgba(136,136,170,0.05)", border: "1px solid rgba(136,136,170,0.2)" }}>
+                  <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-gray)" }}>COMPETITORS</p>
+                  <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.7rem", color: "#ffffff", marginTop: "0.2rem" }}>{gameData.allTeams.length}</p>
+                  <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)" }}>teams in game</p>
+                </div>
+              </div>
+            );
+          })()}
           <p style={{ fontFamily: "var(--font-pixel), monospace", fontSize: "0.38rem", color: "var(--px-gray)", marginBottom: "0.5rem" }}>
             FLYING CAR DEMAND BY SEGMENT
           </p>
@@ -299,21 +306,24 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
             { label: "SUV",        demand: YEAR1_DEMAND_BY_TYPE.SUV },
             { label: "Sports Car", demand: YEAR1_DEMAND_BY_TYPE.SPORTS_CAR },
             { label: "Truck",      demand: YEAR1_DEMAND_BY_TYPE.TRUCK },
-          ]).map(({ label, demand }) => (
-            <div key={label} className="flex items-center gap-2 mb-2">
-              <span style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.85rem", color: "#cccccc", minWidth: "78px" }}>
-                {label}
-              </span>
-              <div style={{ flex: 1, height: "6px", background: "#1a1a2e" }}>
-                <div style={{ width: `${(demand / YEAR1_DEMAND_BY_TYPE.COMPACT) * 100}%`, height: "100%", background: "var(--px-cyan)", opacity: 0.6 }} />
+          ]).map(({ label, demand }, idx) => {
+            const seg = relativeSegmentLabel(idx);
+            return (
+              <div key={label} className="flex items-center gap-2 mb-2">
+                <span style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.85rem", color: "#cccccc", minWidth: "78px" }}>
+                  {label}
+                </span>
+                <div style={{ flex: 1, height: "6px", background: "#1a1a2e" }}>
+                  <div style={{ width: `${(demand / YEAR1_DEMAND_BY_TYPE.COMPACT) * 100}%`, height: "100%", background: "var(--px-cyan)", opacity: 0.6 }} />
+                </div>
+                <span style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.85rem", color: seg.color, minWidth: "60px", textAlign: "right" }}>
+                  {seg.label}
+                </span>
               </div>
-              <span style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.85rem", color: "var(--px-amber)", minWidth: "40px", textAlign: "right" }}>
-                ~{Math.round(demand / 10_000) * 10}K
-              </span>
-            </div>
-          ))}
+            );
+          })}
           <p style={{ fontFamily: "var(--font-pixel-body), monospace", fontSize: "0.82rem", color: "var(--px-gray)", marginTop: "0.75rem" }}>
-            Demand shifts each year with world events, pricing, and tech. Share it equally and each team targets ~{gameData.allTeams.length > 0 ? Math.round(300_000 / gameData.allTeams.length / 1000) : "–"}K units.
+            Demand scales with team count. A small factory (5K units) fills ~one segment in one region.
           </p>
         </div>
 
@@ -472,7 +482,7 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
               }}
             >
               <div>
-                <span style={{ color: "#888899" }}>TOTAL DEMAND: <Tooltip text="How large the overall flying car market is this year. Invest in Market Research or Pricing Research to get closer estimates." /></span>
+                <span style={{ color: "#888899" }}>TOTAL DEMAND: <Tooltip text="How large the overall flying car market is this year. Scales with the number of teams — a small factory fills roughly one segment in one region." /></span>
                 <br />
                 <span style={{ color: totalDemandLabel(briefing.totalFlyingCarDemand).color, fontSize: "1.2rem" }}>
                   {totalDemandLabel(briefing.totalFlyingCarDemand).label}
@@ -516,7 +526,7 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
                   lineHeight: 1.8,
                 }}
               >
-                SEGMENT DEMAND BREAKDOWN <Tooltip text="Relative demand for each vehicle type. Invest in Market Research to sharpen these estimates. Design vehicles that target high-demand segments." />
+                SEGMENT DEMAND BREAKDOWN <Tooltip text="Relative demand ranking across vehicle types. Build for the hottest segment or find a niche. Exact numbers unlock via Market Analytics (R&D)." />
               </p>
               <div
                 style={{
@@ -527,19 +537,21 @@ export function PlayerLobbyClient({ gameData: initial }: Props) {
                   fontSize: "0.95rem",
                 }}
               >
-                {Object.entries(briefing.demandByType).map(([type, demand]) => {
-                  const seg = segmentDemandLabel(demand as number);
-                  return (
-                  <div key={type}>
-                    <span style={{ color: "#8888aa", textTransform: "uppercase" }}>
-                      {type}:{" "}
-                    </span>
-                    <span style={{ color: seg.color }}>
-                      {seg.label}
-                    </span>
-                  </div>
-                  );
-                })}
+                {(() => {
+                  const entries = Object.entries(briefing.demandByType) as [string, number][];
+                  const sorted = [...entries].sort(([,a], [,b]) => b - a);
+                  const rankMap = new Map(sorted.map(([key], i) => [key, i]));
+                  return entries.map(([type, demand]) => {
+                    const rank = rankMap.get(type) ?? 4;
+                    const seg = relativeSegmentLabel(rank);
+                    return (
+                      <div key={type}>
+                        <span style={{ color: "#8888aa", textTransform: "uppercase" }}>{type}: </span>
+                        <span style={{ color: seg.color }}>{seg.label}</span>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
               {briefing.npcLobbyingNote && (
                 <p

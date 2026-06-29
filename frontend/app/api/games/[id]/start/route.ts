@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Prisma } from "@/app/generated/prisma/client";
 import { drawWorldEvent, buildYear1Briefing } from "@/lib/game-utils";
+import { YEAR1_DEMAND_BY_TYPE_BY_REGION, YEAR1_TOTAL_TRADITIONAL } from "@/lib/engine/constants";
 
 // POST /api/games/[id]/start — start a game (facilitator only)
 export async function POST(
@@ -53,14 +54,30 @@ export async function POST(
   const worldEvent = drawWorldEvent();
   const settings = game.settings as Record<string, unknown>;
   const economicCondition = (settings.economicCondition as string) ?? "stable";
-  const briefing = buildYear1Briefing(economicCondition);
+  const teamCount = game.teams.length;
+  const briefing = buildYear1Briefing(economicCondition, teamCount);
+
+  // Scale per-region demand by team count (same ratio as total demand)
+  const scale = Math.max(1, teamCount) / 4;
+  const scaledDemandByTypeByRegion = Object.fromEntries(
+    Object.entries(YEAR1_DEMAND_BY_TYPE_BY_REGION).map(([vt, regions]) => [
+      vt,
+      Object.fromEntries(Object.entries(regions).map(([r, d]) => [r, Math.round((d as number) * scale)])),
+    ])
+  );
 
   // Serialize through JSON to get a plain Prisma-compatible InputJsonValue
   const worldEventJson = JSON.parse(
     JSON.stringify(worldEvent)
   ) as Prisma.InputJsonValue;
   const newSettings = JSON.parse(
-    JSON.stringify({ ...settings, year1Briefing: briefing })
+    JSON.stringify({
+      ...settings,
+      year1Briefing: briefing,
+      totalFlyingCarDemand: briefing.totalFlyingCarDemand,
+      totalTraditionalDemand: YEAR1_TOTAL_TRADITIONAL,
+      demandByTypeByRegion: scaledDemandByTypeByRegion,
+    })
   ) as Prisma.InputJsonValue;
 
   const now = new Date();

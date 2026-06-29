@@ -42,14 +42,6 @@ const RECURRING_OPTIONS: {
     detail: "In Results, you'll see your chosen competitor's sale prices and units sold per model — know what you're up against before the next round.",
     needsTarget: "competitor",
   },
-  {
-    key: "marketResearch",
-    label: "Regional Demand Signals",
-    cost: "$1.5M/yr",
-    effect: "Soft demand signals for one region/yr",
-    detail: "Each round in Results, you'll see a qualitative HIGH / MEDIUM / LOW demand breakdown by vehicle type for your chosen region. Renew each year. For exact numbers, use Market Intelligence (one-time unlocks below).",
-    needsTarget: "region",
-  },
 ];
 
 const RECURRING_COSTS: Record<keyof RdSectionType["recurring"], number> = {
@@ -57,7 +49,6 @@ const RECURRING_COSTS: Record<keyof RdSectionType["recurring"], number> = {
   partDependability: 5_000_000,
   pricingResearch: 1_000_000,
   competitorResearch: 2_000_000,
-  marketResearch: 1_500_000,
 };
 
 const TIER_COLORS: Record<number, string> = {

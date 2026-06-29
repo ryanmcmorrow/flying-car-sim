@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { buildYear1Briefing } from "@/lib/game-utils";
+import type { MarketBriefing } from "@/lib/game-utils";
 import {
   getEmptyVehicleSection,
   getEmptyRdSection,
@@ -52,7 +52,7 @@ export default async function PlayPage({ params, searchParams }: PageProps) {
     where: { id: gameId },
     include: {
       rounds: { orderBy: { roundNumber: "asc" } },
-      teams: { select: { id: true, brandName: true } },
+      teams: { select: { id: true, brandName: true, aiDifficulty: true } },
     },
   });
 
@@ -151,13 +151,24 @@ export default async function PlayPage({ params, searchParams }: PageProps) {
 
   const totalFlyingDemand = (game.settings as Record<string, unknown>).totalFlyingCarDemand as number | undefined;
 
-  // Market briefing (round 1 only)
+  // Market briefing — read from settings (written at game start, scaled by team count)
   const briefing =
     round.roundNumber === 1
-      ? buildYear1Briefing(
-          (game.settings as Record<string, string>)?.economicCondition ?? "stable"
-        )
+      ? ((game.settings as Record<string, unknown>).year1Briefing as MarketBriefing | null) ?? null
       : null;
+
+  // Which teams haven't submitted yet for the current round
+  const roundDecisions = await db.decision.findMany({
+    where: { roundId: round.id },
+    select: { teamId: true, submittedAt: true },
+  });
+  const submittedTeamIds = new Set(roundDecisions.filter((d) => d.submittedAt).map((d) => d.teamId));
+  const allTeams = game.teams.map((t) => ({
+    id: t.id,
+    brandName: t.brandName,
+    isAi: t.aiDifficulty !== null,
+    submitted: submittedTeamIds.has(t.id),
+  }));
 
   // Inventory items from previous round (round 2+ only)
   type InventoryItem = {
@@ -242,6 +253,7 @@ export default async function PlayPage({ params, searchParams }: PageProps) {
         currentRound: game.currentRound,
         status: game.status,
         mode: game.mode,
+        allTeams,
       }}
       round={{
         id: round.id,

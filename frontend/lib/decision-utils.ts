@@ -22,7 +22,6 @@ export function getEmptyRdSection(): RdSection {
       partDependability: false,
       pricingResearch: false,
       competitorResearch: false,
-      marketResearch: false,
     },
     recurringTargets: {},
     techTreeUnlocks: [],

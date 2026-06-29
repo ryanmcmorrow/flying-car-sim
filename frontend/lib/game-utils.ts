@@ -1,4 +1,5 @@
 import { TeamMemberRole } from "@/app/generated/prisma/client";
+import { YEAR1_TOTAL_FLYING, YEAR1_DEMAND_BY_TYPE } from "@/lib/engine/constants";
 
 // ── Game Code Generation ──────────────────────────────────────────────────────
 // Excludes ambiguous chars: 0/O, 1/I/L
@@ -670,16 +671,18 @@ export interface MarketBriefing {
 }
 
 export function buildYear1Briefing(
-  economicCondition: string
+  economicCondition: string,
+  teamCount: number = 4
 ): MarketBriefing {
+  const scale = Math.max(1, teamCount) / 4;
   return {
-    totalFlyingCarDemand: 300000,
+    totalFlyingCarDemand: Math.round(YEAR1_TOTAL_FLYING * scale),
     demandByType: {
-      compact: 90180,
-      sedan: 82260,
-      suv: 68100,
-      sportscar: 31440,
-      truck: 28020,
+      compact:   Math.round(YEAR1_DEMAND_BY_TYPE.COMPACT * scale),
+      sedan:     Math.round(YEAR1_DEMAND_BY_TYPE.SEDAN * scale),
+      suv:       Math.round(YEAR1_DEMAND_BY_TYPE.SUV * scale),
+      sportscar: Math.round(YEAR1_DEMAND_BY_TYPE.SPORTS_CAR * scale),
+      truck:     Math.round(YEAR1_DEMAND_BY_TYPE.TRUCK * scale),
     },
     publicPerception: 30,
     policyScore: 0,

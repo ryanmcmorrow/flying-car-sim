@@ -352,7 +352,6 @@ export const RD_RECURRING_COSTS: Record<string, number> = {
   partDependability: 5_000_000,
   pricingResearch: 1_000_000,
   competitorResearch: 2_000_000,
-  marketResearch: 1_500_000,
 };
 
 // ── Tech tree costs ───────────────────────────────────────────────────────────

@@ -46,7 +46,10 @@ const REGION_INTEL = [
 interface DecisionRoomProps {
   gameId: string;
   isFacilitator?: boolean;
-  game: { id: string; code: string; currentRound: number; status: string; mode: string };
+  game: {
+    id: string; code: string; currentRound: number; status: string; mode: string;
+    allTeams: Array<{ id: string; brandName: string; isAi: boolean; submitted: boolean }>;
+  };
   round: {
     id: string;
     roundNumber: number;
@@ -360,7 +363,7 @@ export function DecisionRoom({
         >
           <div
             className="pixel-card pixel-card-green"
-            style={{ pointerEvents: "none", textAlign: "center" }}
+            style={{ textAlign: "center" }}
           >
             <p
               className="pixel-heading"
@@ -368,16 +371,33 @@ export function DecisionRoom({
             >
               DECISIONS LOCKED
             </p>
-            <p
-              style={{
-                fontFamily: "var(--font-pixel-body)",
-                fontSize: "1.1rem",
-                color: "var(--px-gray)",
-                marginTop: "0.5rem",
-              }}
-            >
-              Waiting for all teams to submit...
-            </p>
+            {(() => {
+              const pending = game.allTeams.filter((t) => !t.submitted && !t.isAi);
+              if (pending.length === 0) {
+                return (
+                  <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "1rem", color: "var(--px-gray)", marginTop: "0.5rem" }}>
+                    All teams submitted. The facilitator can now resolve the round.
+                  </p>
+                );
+              }
+              return (
+                <>
+                  <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "1rem", color: "var(--px-gray)", marginTop: "0.5rem" }}>
+                    Still waiting on {pending.length} team{pending.length > 1 ? "s" : ""}:
+                  </p>
+                  <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem", justifyContent: "center" }}>
+                    {pending.map((t) => (
+                      <span key={t.id} style={{ fontFamily: "var(--font-pixel)", fontSize: "0.42rem", color: "var(--px-amber)", border: "1px solid var(--px-amber)", padding: "0.2rem 0.5rem" }}>
+                        {t.brandName}
+                      </span>
+                    ))}
+                  </div>
+                  <p style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.9rem", color: "var(--px-gray)", marginTop: "0.75rem" }}>
+                    Once all teams submit, the facilitator resolves the round.
+                  </p>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -564,20 +584,25 @@ export function DecisionRoom({
             const hasMarketAnalytics = rdUnlocks.includes("market_analytics");
             const segmentDemand = briefing?.demandByType as Record<string, number> | undefined;
             const SEGMENTS = [
-              { key: "COMPACT",    label: "Compact" },
-              { key: "SEDAN",      label: "Sedan" },
-              { key: "SUV",        label: "SUV" },
-              { key: "SPORTS_CAR", label: "Sports Car" },
-              { key: "TRUCK",      label: "Truck" },
+              { label: "Compact",    constKey: "COMPACT" as const,    briefKey: "compact" },
+              { label: "Sedan",      constKey: "SEDAN" as const,      briefKey: "sedan" },
+              { label: "SUV",        constKey: "SUV" as const,        briefKey: "suv" },
+              { label: "Sports Car", constKey: "SPORTS_CAR" as const, briefKey: "sportscar" },
+              { label: "Truck",      constKey: "TRUCK" as const,      briefKey: "truck" },
             ];
-            const maxDemand = YEAR1_DEMAND_BY_TYPE.COMPACT;
-            const totalFlying = totalFlyingDemand ?? briefing?.totalFlyingCarDemand ?? 300_000;
-            function qualLabel(demand: number) {
-              if (demand >= 80_000) return { label: "VERY HIGH", color: "var(--px-green)" };
-              if (demand >= 50_000) return { label: "HIGH",      color: "var(--px-green)" };
-              if (demand >= 30_000) return { label: "MEDIUM",    color: "var(--px-amber)" };
-              if (demand >= 15_000) return { label: "LOW",        color: "var(--px-pink)" };
-              return                       { label: "MINIMAL",    color: "var(--px-gray)" };
+            // Use briefing demand for relative sizing; fall back to proportional constants
+            const demands = SEGMENTS.map(({ constKey, briefKey }) =>
+              (segmentDemand?.[briefKey] as number | undefined) ?? YEAR1_DEMAND_BY_TYPE[constKey]
+            );
+            const maxDemand = Math.max(...demands, 1);
+            const sortedDemands = [...demands].sort((a, b) => b - a);
+            function relLabel(demand: number): { label: string; color: string } {
+              const rank = sortedDemands.indexOf(demand);
+              if (rank === 0) return { label: "HOTTEST",  color: "var(--px-green)" };
+              if (rank === 1) return { label: "HIGH",     color: "var(--px-green)" };
+              if (rank === 2) return { label: "MEDIUM",   color: "var(--px-amber)" };
+              if (rank === 3) return { label: "LOW",      color: "var(--px-pink)" };
+              return                 { label: "NICHE",    color: "var(--px-gray)" };
             }
             return (
               <div className="mt-3 pixel-transmission">
@@ -586,7 +611,7 @@ export function DecisionRoom({
                     EST. FLYING CAR MARKET
                   </p>
                   <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-cyan)" }}>
-                    ~{Math.round(totalFlying / 10_000) * 10}K est. total demand
+                    segment demand ranking
                   </span>
                 </div>
                 {round.worldEvent && (
@@ -594,11 +619,11 @@ export function DecisionRoom({
                     ⚠ World event above may shift these figures.
                   </p>
                 )}
-                {SEGMENTS.map(({ key, label }) => {
-                  const demand = segmentDemand?.[key] ?? YEAR1_DEMAND_BY_TYPE[key as keyof typeof YEAR1_DEMAND_BY_TYPE];
-                  const { label: ql, color: qc } = qualLabel(demand);
+                {SEGMENTS.map(({ label, constKey }, idx) => {
+                  const demand = demands[idx];
+                  const { label: ql, color: qc } = relLabel(demand);
                   return (
-                    <div key={key} className="flex items-center gap-2 mb-2">
+                    <div key={constKey} className="flex items-center gap-2 mb-2">
                       <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "#cccccc", minWidth: "78px" }}>
                         {label}
                       </span>
@@ -607,7 +632,7 @@ export function DecisionRoom({
                       </div>
                       {hasMarketAnalytics ? (
                         <span style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: "var(--px-amber)", minWidth: "40px", textAlign: "right" }}>
-                          ~{Math.round(demand / 10_000) * 10}K
+                          ~{Math.round(demand / 1_000)}K
                         </span>
                       ) : (
                         <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.35rem", color: qc, minWidth: "55px", textAlign: "right" }}>
