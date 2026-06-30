@@ -207,7 +207,7 @@ export function MarketingSection({
                         type="number"
                         min={0}
                         max={100}
-                        value={pct || ""}
+                        value={pct > 0 ? String(pct) : ""}
                         disabled={disabled}
                         placeholder="0"
                         onChange={(e) => setChannel(ch, Math.min(100, parseInt(e.target.value) || 0))}
@@ -290,7 +290,7 @@ export function MarketingSection({
                     type="number"
                     min={0}
                     max={100}
-                    value={pct || ""}
+                    value={pct > 0 ? String(pct) : ""}
                     placeholder="0"
                     disabled={disabled}
                     onChange={(e) =>

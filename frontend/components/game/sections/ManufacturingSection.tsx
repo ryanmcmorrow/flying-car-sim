@@ -166,10 +166,13 @@ export function ManufacturingSection({
 }) {
   const newFacilities = value.newFacilities ?? [];
 
-  // All active facilities = owned (from prior rounds) + new (this round)
+  // Mirror the engine's dedup: don't count a new facility if the same region+size is already owned.
+  const ownedKeys = new Set(currentFacilities.map((f) => `${f.region}::${f.size}`));
+  const effectiveNewFacilities = newFacilities.filter((f) => !ownedKeys.has(`${f.region}::${f.size}`));
+
   const allFacilities = [
     ...currentFacilities.map((f) => ({ ...f, isOwned: true })),
-    ...newFacilities.map((f) => ({ ...f, isOwned: false })),
+    ...effectiveNewFacilities.map((f) => ({ ...f, isOwned: false })),
   ];
   const totalCapacity = allFacilities.reduce((s, f) => s + (CAPACITY[f.size as SpaceSize] ?? 0), 0);
   const totalUnits = (value.productionRuns ?? []).reduce((s, r) => s + (r.units || 0), 0);
@@ -181,6 +184,10 @@ export function ManufacturingSection({
 
   function commitNewFacility() {
     if (!addingSize || !addingRegion) return;
+    const key = `${addingRegion}::${addingSize}`;
+    // Don't add a facility that already exists (same region+size) — the engine deduplicates
+    // and the submit guard would reject it as over-capacity.
+    if (ownedKeys.has(key) || newFacilities.some((f) => `${f.region}::${f.size}` === key)) return;
     const next: Facility = { region: addingRegion, size: addingSize };
     onChange({ ...value, newFacilities: [...newFacilities, next] });
     setAddingSize(null);
