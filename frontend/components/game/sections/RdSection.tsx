@@ -1,7 +1,7 @@
 "use client";
 
 import { Tooltip } from "@/components/game/Tooltip";
-import { getTechTreeUnlocks, TECH_TREE_DEF } from "@/lib/decision-utils";
+import { getTechTreeUnlocks, TECH_TREE_DEF, type TechNode } from "@/lib/decision-utils";
 import type { RdSection as RdSectionType } from "@/types/decisions";
 
 const RECURRING_OPTIONS: {
@@ -254,10 +254,21 @@ export function RdSection({
     onChange({ ...value, techTreeUnlocks: [...kept, key] });
   }
 
-  // Group tech nodes by tier
-  const byTier = [1, 2, 3, 4].map((tier) =>
-    techNodes.filter((n) => n.tier === tier)
-  );
+  // Group nodes by tree, sorted by tier — for vertical chain layout
+  const mainTrees = ["mfg", "aero", "power", "market"] as const;
+  const byTree: Record<string, TechNode[]> = {};
+  for (const node of techNodes.filter((n) => n.tree !== "segment")) {
+    (byTree[node.tree] ??= []).push(node);
+    byTree[node.tree].sort((a, b) => a.tier - b.tier);
+  }
+  const segmentNodes = techNodes.filter((n) => n.tree === "segment");
+
+  const TREE_META: Record<string, { label: string; color: string }> = {
+    mfg:    { label: "MANUFACTURING",  color: "var(--px-cyan)"  },
+    aero:   { label: "AERODYNAMICS",   color: "var(--px-green)" },
+    power:  { label: "POWER / GREEN",  color: "var(--px-amber)" },
+    market: { label: "MARKET INTEL",   color: "var(--px-pink)"  },
+  };
 
   return (
     <div className="space-y-6">
@@ -354,127 +365,194 @@ export function RdSection({
         </div>
       </div>
 
-      {/* Tech Tree */}
+      {/* Tech Tree — vertical chains, one column per research path */}
       <div>
         <h2
           className="pixel-heading mb-3"
           style={{ fontSize: "0.75rem", color: "var(--px-cyan)" }}
         >
-          Tech Tree <Tooltip text="One-time investments that permanently unlock capabilities. Higher tiers require lower-tier nodes first. You may research one tier per tree each round — invest across multiple trees at once, but not two tiers of the same tree. Once unlocked, you own it forever." />
+          Tech Tree <Tooltip text="One-time investments that permanently unlock capabilities. Each path must be researched in order — you can't skip tiers. You may advance one tier per path per year, but you can invest in multiple paths at once. Once unlocked, you own it forever." />
         </h2>
-        <div className="space-y-4">
-          {byTier.map((nodes, i) => (
-            <div key={i + 1}>
-              <div
-                style={{
+
+        {/* 4 vertical chains side-by-side */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem", alignItems: "start" }}>
+          {mainTrees.map((tree) => {
+            const meta = TREE_META[tree];
+            const nodes = byTree[tree] ?? [];
+            return (
+              <div key={tree}>
+                {/* Tree header */}
+                <div style={{
                   fontFamily: "var(--font-pixel)",
-                  fontSize: "0.45rem",
-                  color: TIER_COLORS[i + 1],
-                  marginBottom: "0.5rem",
-                  letterSpacing: "0.1em",
-                }}
-              >
-                Tier {i + 1}
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {nodes.map((node) => {
+                  fontSize: "0.38rem",
+                  color: meta.color,
+                  letterSpacing: "0.08em",
+                  textAlign: "center",
+                  marginBottom: "0.4rem",
+                  paddingBottom: "0.25rem",
+                  borderBottom: `2px solid ${meta.color}`,
+                }}>
+                  {meta.label}
+                </div>
+
+                {nodes.map((node, idx) => {
                   const isOwned = existingUnlocks.includes(node.key);
                   const isSelected = value.techTreeUnlocks.includes(node.key);
 
                   let borderColor = "var(--px-gray)";
-                  let textColor = "#777";
+                  let textColor = "#666";
                   if (isOwned) {
                     borderColor = "var(--px-green)";
                     textColor = "var(--px-green)";
                   } else if (isSelected) {
-                    borderColor = TIER_COLORS[node.tier];
-                    textColor = TIER_COLORS[node.tier];
+                    borderColor = meta.color;
+                    textColor = meta.color;
                   } else if (node.available) {
-                    borderColor = "var(--px-cyan)";
+                    borderColor = meta.color;
                     textColor = "var(--px-white)";
                   }
 
                   return (
-                    <button
-                      key={node.key}
-                      disabled={disabled || isOwned || (!node.available && !isSelected)}
-                      onClick={() => !isOwned && toggleTechUnlock(node.key)}
-                      style={{
-                        border: `3px solid ${borderColor}`,
-                        background: isSelected
-                          ? "rgba(0,245,255,0.08)"
-                          : "var(--px-bg-2)",
-                        padding: "0.6rem",
-                        cursor:
-                          isOwned || (!node.available && !isSelected) || disabled
-                            ? "default"
-                            : "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      <div
+                    <div key={node.key}>
+                      <button
+                        disabled={disabled || isOwned || (!node.available && !isSelected)}
+                        onClick={() => !isOwned && toggleTechUnlock(node.key)}
                         style={{
-                          fontFamily: "var(--font-pixel)",
-                          fontSize: "0.42rem",
-                          color: textColor,
-                          lineHeight: 1.4,
+                          display: "block",
+                          width: "100%",
+                          border: `2px solid ${borderColor}`,
+                          background: isOwned
+                            ? "rgba(57,255,20,0.05)"
+                            : isSelected
+                            ? "rgba(0,245,255,0.08)"
+                            : node.available
+                            ? "var(--px-bg-2)"
+                            : "rgba(0,0,0,0.3)",
+                          padding: "0.5rem",
+                          cursor: isOwned || (!node.available && !isSelected) || disabled ? "default" : "pointer",
+                          textAlign: "left",
                         }}
                       >
-                        {node.name}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: "var(--font-pixel-body)",
-                          fontSize: "0.85rem",
-                          color: "var(--px-amber)",
-                          marginTop: "0.2rem",
-                        }}
-                      >
-                        {fmt(node.cost)}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: "var(--font-pixel-body)",
-                          fontSize: "0.8rem",
-                          color: isOwned ? "var(--px-gray)" : isSelected ? "var(--px-cyan)" : "#aaaacc",
-                          marginTop: "0.3rem",
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        {node.desc}
-                      </div>
-                      {isOwned && (
-                        <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.38rem", color: "var(--px-green)", marginTop: "0.2rem" }}>
-                          ✓ Unlocked
+                        {/* Tier badge */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.2rem" }}>
+                          <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.42rem", color: textColor, lineHeight: 1.3 }}>
+                            {node.name}
+                          </div>
+                          <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.3rem", color: "#555", flexShrink: 0, marginLeft: "0.2rem" }}>
+                            T{node.tier}
+                          </div>
+                        </div>
+                        <div style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.85rem", color: isOwned || isSelected ? "var(--px-amber)" : "#888", marginBottom: "0.2rem" }}>
+                          {fmt(node.cost)}
+                        </div>
+                        <div style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.75rem", color: isOwned ? "#666" : isSelected ? "var(--px-cyan)" : node.available ? "#aaaacc" : "#555", lineHeight: 1.4 }}>
+                          {node.desc}
+                        </div>
+
+                        {isOwned && (
+                          <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.35rem", color: "var(--px-green)", marginTop: "0.25rem" }}>
+                            ✓ UNLOCKED
+                          </div>
+                        )}
+                        {isOwned && ownedExclusives[node.key] && (
+                          <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.3rem", color: "var(--px-cyan)", marginTop: "0.1rem", padding: "0.1rem 0.25rem", border: "1px solid var(--px-cyan)", background: "rgba(0,245,255,0.07)", display: "inline-block" }}>
+                            EXCLUSIVE Yr {ownedExclusives[node.key]}
+                          </div>
+                        )}
+                        {isSelected && !isOwned && (
+                          <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.35rem", color: meta.color, marginTop: "0.25rem" }}>
+                            ▶ INVESTING...
+                          </div>
+                        )}
+                        {!isOwned && !isSelected && competitorExclusives[node.key] && (
+                          <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.3rem", color: "var(--px-amber)", marginTop: "0.1rem", padding: "0.1rem 0.25rem", border: "1px solid var(--px-amber)", background: "rgba(255,190,11,0.07)", display: "inline-block" }}>
+                            ⚠ RIVAL HOLDS Yr {competitorExclusives[node.key]}
+                          </div>
+                        )}
+                        {!node.available && !isOwned && !isSelected && (
+                          <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.3rem", color: "#666", marginTop: "0.15rem" }}>
+                            🔒 {node.prereqs.map((p: string) => TECH_TREE_DEF.find((n) => n.key === p)?.name ?? p).join(" + ")}
+                          </div>
+                        )}
+                      </button>
+
+                      {/* Chain connector between nodes */}
+                      {idx < nodes.length - 1 && (
+                        <div style={{ textAlign: "center", color: isOwned ? "var(--px-green)" : "#444", fontSize: "0.7rem", lineHeight: 1, padding: "0.15rem 0", userSelect: "none" }}>
+                          ▼
                         </div>
                       )}
-                      {isOwned && ownedExclusives[node.key] && (
-                        <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.32rem", color: "var(--px-cyan)", marginTop: "0.15rem", padding: "0.15rem 0.3rem", border: "1px solid var(--px-cyan)", background: "rgba(0,245,255,0.07)" }}>
-                          🔒 EXCLUSIVE — Yr {ownedExclusives[node.key]}
-                        </div>
-                      )}
-                      {isSelected && !isOwned && (
-                        <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.38rem", color: TIER_COLORS[node.tier], marginTop: "0.2rem" }}>
-                          Investing...
-                        </div>
-                      )}
-                      {!isOwned && !isSelected && competitorExclusives[node.key] && (
-                        <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.32rem", color: "var(--px-amber)", marginTop: "0.15rem", padding: "0.15rem 0.3rem", border: "1px solid var(--px-amber)", background: "rgba(255,190,11,0.07)" }}>
-                          ⚠ RIVAL HOLDS — until Yr {competitorExclusives[node.key]}
-                        </div>
-                      )}
-                      {!node.available && !isOwned && !isSelected && !competitorExclusives[node.key] && (
-                        <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.35rem", color: "#9999bb", marginTop: "0.2rem" }}>
-                          Needs: {node.prereqs.map((p) => TECH_TREE_DEF.find((n) => n.key === p)?.name ?? p).join(", ")}
-                        </div>
-                      )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+
+        {/* Segment Platform Investments — separate section below the main chains */}
+        {segmentNodes.length > 0 && (
+          <div style={{ marginTop: "1rem" }}>
+            <div style={{
+              fontFamily: "var(--font-pixel)",
+              fontSize: "0.38rem",
+              color: "#b48cde",
+              letterSpacing: "0.08em",
+              marginBottom: "0.4rem",
+              paddingBottom: "0.25rem",
+              borderBottom: "2px solid #b48cde",
+            }}>
+              SEGMENT PLATFORMS — pick at most one per year, permanently yours
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.4rem" }}>
+              {segmentNodes.map((node) => {
+                const isOwned = existingUnlocks.includes(node.key);
+                const isSelected = value.techTreeUnlocks.includes(node.key);
+                const segColor = "#b48cde";
+
+                let borderColor = "var(--px-gray)";
+                let textColor = "#666";
+                if (isOwned) { borderColor = "var(--px-green)"; textColor = "var(--px-green)"; }
+                else if (isSelected) { borderColor = segColor; textColor = segColor; }
+                else if (node.available) { borderColor = segColor; textColor = "var(--px-white)"; }
+
+                return (
+                  <button
+                    key={node.key}
+                    disabled={disabled || isOwned || (!node.available && !isSelected)}
+                    onClick={() => !isOwned && toggleTechUnlock(node.key)}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      border: `2px solid ${borderColor}`,
+                      background: isOwned ? "rgba(57,255,20,0.05)" : isSelected ? "rgba(180,140,222,0.1)" : node.available ? "var(--px-bg-2)" : "rgba(0,0,0,0.3)",
+                      padding: "0.5rem",
+                      cursor: isOwned || (!node.available && !isSelected) || disabled ? "default" : "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.38rem", color: textColor, lineHeight: 1.3, marginBottom: "0.15rem" }}>
+                      {node.name}
+                    </div>
+                    <div style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.8rem", color: isOwned || isSelected ? "var(--px-amber)" : "#888", marginBottom: "0.15rem" }}>
+                      {fmt(node.cost)}
+                    </div>
+                    <div style={{ fontFamily: "var(--font-pixel-body)", fontSize: "0.72rem", color: isOwned ? "#666" : isSelected ? segColor : node.available ? "#aaaacc" : "#555", lineHeight: 1.35 }}>
+                      {node.desc}
+                    </div>
+                    {isOwned && <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.32rem", color: "var(--px-green)", marginTop: "0.2rem" }}>✓ UNLOCKED</div>}
+                    {isSelected && !isOwned && <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.32rem", color: segColor, marginTop: "0.2rem" }}>▶ INVESTING...</div>}
+                    {!isOwned && !isSelected && competitorExclusives[node.key] && (
+                      <div style={{ fontFamily: "var(--font-pixel)", fontSize: "0.28rem", color: "var(--px-amber)", marginTop: "0.1rem", padding: "0.1rem 0.2rem", border: "1px solid var(--px-amber)", background: "rgba(255,190,11,0.07)", display: "inline-block" }}>
+                        ⚠ RIVAL HOLDS Yr {competitorExclusives[node.key]}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Market Intelligence */}

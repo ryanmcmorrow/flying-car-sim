@@ -1004,17 +1004,24 @@ export function resolveRound(input: ResolveRoundInput): ResolveRoundOutput {
     const calcs = teamCalcs[team.teamId];
     if (!calcs) continue;
 
+    // One unlock per tree per round — track which trees have been claimed.
+    const treeClaimedThisRound: Record<string, boolean> = {};
+
     for (const key of calcs.unlocksPurchased) {
       // Validate prereqs from TECH_TREE_DEF
       const nodeDef = TECH_TREE_DEF.find((n) => n.key === key);
       if (!nodeDef) continue;
 
-      const prereqsMet = nodeDef.prereqs.every(
-        (p) =>
-          team.existingRdUnlocks.includes(p) ||
-          calcs.unlocksPurchased.includes(p)
+      // Prereqs must be satisfied by already-owned unlocks only, not same-round purchases.
+      // This prevents chaining multiple tiers in one round even if both are submitted.
+      const prereqsMet = nodeDef.prereqs.every((p) =>
+        team.existingRdUnlocks.includes(p)
       );
       if (!prereqsMet) continue;
+
+      // Enforce one unlock per tree per round.
+      if (treeClaimedThisRound[nodeDef.tree]) continue;
+      treeClaimedThisRound[nodeDef.tree] = true;
 
       // Tier-1 nodes are non-exclusive — foundational tech, anyone can buy them.
       // Tier-2+ gets first-mover exclusivity for EXCLUSIVITY_WINDOW rounds.
